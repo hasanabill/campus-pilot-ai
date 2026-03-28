@@ -35,6 +35,14 @@ export const listTicketsQuerySchema = z.object({
   limit: z.number().int().min(1).max(100).optional(),
 });
 
+export const assignTicketSchema = z.object({
+  assigned_to: z.string().min(1),
+});
+
+export const escalateTicketSchema = z.object({
+  reason: z.string().max(500).optional(),
+});
+
 type Requester = {
   userId: string;
   role: AppRole;
@@ -68,6 +76,19 @@ async function resolveStudentProfileId(requester: Requester, studentProfileId?: 
 
 function isPrivileged(role: AppRole): boolean {
   return role === "admin" || role === "faculty" || role === "registrar";
+}
+
+function canTransition(current: (typeof ticketStatuses)[number], next: (typeof ticketStatuses)[number]) {
+  const transitions: Record<(typeof ticketStatuses)[number], (typeof ticketStatuses)[number][]> = {
+    pending: ["in_review", "rejected", "escalated"],
+    in_review: ["approved", "rejected", "completed", "escalated"],
+    approved: ["completed", "escalated"],
+    rejected: [],
+    completed: [],
+    escalated: ["in_review", "approved", "rejected", "completed"],
+  };
+
+  return transitions[current]?.includes(next) ?? false;
 }
 
 export async function createTicket(requester: Requester, payload: z.infer<typeof createTicketSchema>) {
@@ -176,16 +197,31 @@ export async function updateTicket(
     due_date: existing.due_date,
   };
 
-  if (parsed.status !== undefined) existing.status = parsed.status;
+  let action: "status_changed" | "assigned" | "escalated" = "status_changed";
+
+  if (parsed.status !== undefined) {
+    const currentStatus = existing.status as (typeof ticketStatuses)[number];
+    const nextStatus = parsed.status;
+
+    if (currentStatus !== nextStatus && !canTransition(currentStatus, nextStatus)) {
+      throw new Error(`Invalid status transition from ${currentStatus} to ${nextStatus}.`);
+    }
+    existing.status = nextStatus;
+  }
+
   if (parsed.priority !== undefined) existing.priority = parsed.priority;
   if (parsed.escalation_level !== undefined) existing.escalation_level = parsed.escalation_level;
   if (parsed.assigned_to !== undefined) {
     existing.assigned_to = parsed.assigned_to
       ? requireObjectId(parsed.assigned_to, "assigned_to")
       : null;
+    action = "assigned";
   }
   if (parsed.due_date !== undefined) {
     existing.due_date = parsed.due_date ? new Date(parsed.due_date) : null;
+  }
+  if (parsed.status === "escalated" || (parsed.escalation_level !== undefined && parsed.escalation_level > oldValue.escalation_level)) {
+    action = "escalated";
   }
 
   await existing.save();
@@ -193,7 +229,7 @@ export async function updateTicket(
   await TicketActivityLog.create({
     ticket_id: existing._id,
     actor_id: requireObjectId(requester.userId, "user id"),
-    action: "status_changed",
+    action,
     old_value: oldValue,
     new_value: {
       status: existing.status,
@@ -205,4 +241,103 @@ export async function updateTicket(
   });
 
   return existing.toObject();
+}
+
+export async function assignTicket(
+  requester: Requester,
+  ticketId: string,
+  payload: z.infer<typeof assignTicketSchema>,
+) {
+  if (!isPrivileged(requester.role)) {
+    throw new Error("Only faculty/admin/registrar can assign tickets.");
+  }
+
+  const parsed = assignTicketSchema.parse(payload);
+  return updateTicket(requester, ticketId, { assigned_to: parsed.assigned_to });
+}
+
+export async function escalateTicket(
+  requester: Requester,
+  ticketId: string,
+  payload: z.infer<typeof escalateTicketSchema>,
+) {
+  if (!isPrivileged(requester.role)) {
+    throw new Error("Only faculty/admin/registrar can escalate tickets.");
+  }
+
+  const parsed = escalateTicketSchema.parse(payload);
+  await connectToDatabase();
+
+  const existing = await Ticket.findById(requireObjectId(ticketId, "ticket id"));
+  if (!existing) {
+    return null;
+  }
+
+  const oldValue = {
+    status: existing.status,
+    escalation_level: existing.escalation_level,
+  };
+
+  existing.status = "escalated";
+  existing.escalation_level = (existing.escalation_level ?? 0) + 1;
+  await existing.save();
+
+  await TicketActivityLog.create({
+    ticket_id: existing._id,
+    actor_id: requireObjectId(requester.userId, "user id"),
+    action: "escalated",
+    old_value: oldValue,
+    new_value: {
+      status: existing.status,
+      escalation_level: existing.escalation_level,
+      reason: parsed.reason ?? null,
+    },
+  });
+
+  return existing.toObject();
+}
+
+export async function runEscalationSweep(requester: Requester) {
+  if (!isPrivileged(requester.role)) {
+    throw new Error("Only faculty/admin/registrar can run escalation sweep.");
+  }
+
+  await connectToDatabase();
+
+  const now = new Date();
+  const overdueTickets = await Ticket.find({
+    due_date: { $ne: null, $lt: now },
+    status: { $in: ["pending", "in_review", "approved"] },
+  });
+
+  const actorId = requireObjectId(requester.userId, "user id");
+  let escalatedCount = 0;
+
+  for (const ticket of overdueTickets) {
+    const previous = {
+      status: ticket.status,
+      escalation_level: ticket.escalation_level,
+      due_date: ticket.due_date,
+    };
+
+    ticket.status = "escalated";
+    ticket.escalation_level = (ticket.escalation_level ?? 0) + 1;
+    await ticket.save();
+
+    await TicketActivityLog.create({
+      ticket_id: ticket._id,
+      actor_id: actorId,
+      action: "escalated",
+      old_value: previous,
+      new_value: {
+        status: ticket.status,
+        escalation_level: ticket.escalation_level,
+        reason: "automatic_overdue_escalation",
+      },
+    });
+
+    escalatedCount += 1;
+  }
+
+  return { escalated_count: escalatedCount };
 }
