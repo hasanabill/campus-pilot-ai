@@ -29,6 +29,9 @@ export default async function Navbar() {
             <Link href="/chat" className="hover:text-zinc-900">
               Chat
             </Link>
+            <Link href="/schedules" className="hover:text-zinc-900">
+              Schedules
+            </Link>
             <Link href="/tickets" className="hover:text-zinc-900">
               Tickets
             </Link>
@@ -38,6 +41,11 @@ export default async function Navbar() {
             {isAuthenticated ? (
               <Link href="/dashboard/tickets" className="hover:text-zinc-900">
                 Ticket Admin
+              </Link>
+            ) : null}
+            {isAuthenticated ? (
+              <Link href="/dashboard/schedules" className="hover:text-zinc-900">
+                Schedule Admin
               </Link>
             ) : null}
           </nav>
