@@ -1,0 +1,45 @@
+import { NextResponse } from "next/server";
+
+import { auth } from "@/lib/auth";
+import { generateDocumentBundle, generateDocumentSchema } from "@/services/documentService";
+
+export async function POST(request: Request) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || !session.user.role) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+
+    if (session.user.role === "student") {
+      return NextResponse.json(
+        { error: "Only faculty/admin/registrar can generate official documents." },
+        { status: 403 },
+      );
+    }
+
+    const body = await request.json();
+    const parsed = generateDocumentSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid input.", details: parsed.error.flatten() },
+        { status: 400 },
+      );
+    }
+
+    const result = await generateDocumentBundle(parsed.data);
+    const pdfArrayBuffer = new ArrayBuffer(result.pdf_bytes.length);
+    new Uint8Array(pdfArrayBuffer).set(result.pdf_bytes);
+
+    return new NextResponse(pdfArrayBuffer, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${result.file_name}"`,
+        "X-Generated-Document": "true",
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Document generation failed.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
