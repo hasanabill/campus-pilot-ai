@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
+import { Types } from "mongoose";
+
 import { auth } from "@/lib/auth";
 import { generateDocumentBundle, generateDocumentSchema } from "@/services/documentService";
+import { notifyDocumentApprovalRequired } from "@/services/notificationService";
 
 export async function POST(request: Request) {
   try {
@@ -27,6 +30,17 @@ export async function POST(request: Request) {
     }
 
     const result = await generateDocumentBundle(parsed.data);
+    const referenceId = new Types.ObjectId().toString();
+
+    try {
+      await notifyDocumentApprovalRequired({
+        document_reference_id: referenceId,
+        message: `Document "${parsed.data.title}" requires approval review.`,
+      });
+    } catch {
+      // Notification failure should not block document generation.
+    }
+
     const pdfArrayBuffer = new ArrayBuffer(result.pdf_bytes.length);
     new Uint8Array(pdfArrayBuffer).set(result.pdf_bytes);
 

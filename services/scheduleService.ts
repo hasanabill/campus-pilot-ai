@@ -2,7 +2,9 @@ import { Types } from "mongoose";
 import { z } from "zod";
 
 import { connectToDatabase } from "@/lib/mongodb";
+import Faculty from "@/models/Faculty";
 import Schedule from "@/models/Schedule";
+import { notifyScheduleChange } from "@/services/notificationService";
 
 const scheduleTypes = ["class", "exam"] as const;
 const scheduleStatuses = ["draft", "published", "updated", "cancelled"] as const;
@@ -194,6 +196,21 @@ export async function createSchedule(
     status: parsed.status,
     created_by: requireObjectId(requester.userId, "user id"),
   });
+
+  try {
+    const facultyProfile = await Faculty.findById(schedule.faculty_id)
+      .select("user_id")
+      .lean<{ user_id: Types.ObjectId } | null>();
+    if (facultyProfile) {
+      await notifyScheduleChange({
+        faculty_user_id: String(facultyProfile.user_id),
+        schedule_id: String(schedule._id),
+        message: `A schedule (${schedule.schedule_type}) has been created/updated for your assignment on ${schedule.day}.`,
+      });
+    }
+  } catch {
+    // Notification failure should not block schedule creation.
+  }
 
   return {
     schedule: schedule.toObject(),

@@ -5,6 +5,7 @@ import { connectToDatabase } from "@/lib/mongodb";
 import Student from "@/models/Student";
 import Ticket from "@/models/Ticket";
 import TicketActivityLog from "@/models/TicketActivityLog";
+import { notifyTicketUpdate } from "@/services/notificationService";
 
 const ticketTypes = ["certificate", "transcript", "correction", "permission", "internship", "other"] as const;
 const ticketPriorities = ["low", "medium", "high", "urgent"] as const;
@@ -114,6 +115,16 @@ export async function createTicket(requester: Requester, payload: z.infer<typeof
     old_value: null,
     new_value: { status: "pending" },
   });
+
+  try {
+    await notifyTicketUpdate({
+      ticket_id: String(ticket._id),
+      student_profile_id: String(ticket.student_id),
+      message: `Your ticket "${ticket.title}" was created with status pending.`,
+    });
+  } catch {
+    // Notification failure should not block ticket creation.
+  }
 
   return ticket.toObject();
 }
@@ -240,6 +251,16 @@ export async function updateTicket(
     },
   });
 
+  try {
+    await notifyTicketUpdate({
+      ticket_id: String(existing._id),
+      student_profile_id: String(existing.student_id),
+      message: `Your ticket "${existing.title}" was updated. Current status: ${existing.status}.`,
+    });
+  } catch {
+    // Notification failure should not block ticket updates.
+  }
+
   return existing.toObject();
 }
 
@@ -294,6 +315,16 @@ export async function escalateTicket(
     },
   });
 
+  try {
+    await notifyTicketUpdate({
+      ticket_id: String(existing._id),
+      student_profile_id: String(existing.student_id),
+      message: `Your ticket "${existing.title}" was escalated for priority handling.`,
+    });
+  } catch {
+    // Notification failure should not block escalation.
+  }
+
   return existing.toObject();
 }
 
@@ -335,6 +366,16 @@ export async function runEscalationSweep(requester: Requester) {
         reason: "automatic_overdue_escalation",
       },
     });
+
+    try {
+      await notifyTicketUpdate({
+        ticket_id: String(ticket._id),
+        student_profile_id: String(ticket.student_id),
+        message: `Your ticket "${ticket.title}" was escalated automatically due to overdue due date.`,
+      });
+    } catch {
+      // Notification failure should not block escalation sweep.
+    }
 
     escalatedCount += 1;
   }
