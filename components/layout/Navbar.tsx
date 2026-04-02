@@ -48,6 +48,11 @@ export default async function Navbar() {
                 Schedule Admin
               </Link>
             ) : null}
+            {isAuthenticated ? (
+              <Link href="/dashboard/reports" className="hover:text-zinc-900">
+                Reports
+              </Link>
+            ) : null}
           </nav>
         </div>
 
