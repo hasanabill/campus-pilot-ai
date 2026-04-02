@@ -5,6 +5,7 @@ import { Types } from "mongoose";
 import { auth } from "@/lib/auth";
 import { generateDocumentBundle, generateDocumentSchema } from "@/services/documentService";
 import { notifyDocumentApprovalRequired } from "@/services/notificationService";
+import { uploadBufferToCloudinary } from "@/services/storageService";
 
 export async function POST(request: Request) {
   try {
@@ -30,6 +31,11 @@ export async function POST(request: Request) {
     }
 
     const result = await generateDocumentBundle(parsed.data);
+    const cloudinaryUpload = await uploadBufferToCloudinary(Buffer.from(result.pdf_bytes), {
+      folder: "campus-pilot/generated-documents",
+      resource_type: "raw",
+      format: "pdf",
+    });
     const referenceId = new Types.ObjectId().toString();
 
     try {
@@ -50,6 +56,8 @@ export async function POST(request: Request) {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${result.file_name}"`,
         "X-Generated-Document": "true",
+        "X-Document-Cloudinary-Url": cloudinaryUpload.secure_url,
+        "X-Document-Public-Id": cloudinaryUpload.public_id,
       },
     });
   } catch (error) {
