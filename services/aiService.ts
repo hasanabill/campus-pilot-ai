@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 
+import { getOrSetCache } from "@/lib/cache";
 import { openai } from "@/lib/openai";
 import { connectToDatabase } from "@/lib/mongodb";
 import KnowledgeBaseChunk from "@/models/KnowledgeBaseChunk";
@@ -45,6 +46,23 @@ export type KnowledgeSearchResult = {
 const EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
 const CHAT_MODEL = process.env.OPENAI_CHAT_MODEL ?? "gpt-4o-mini";
 const TOP_K_DEFAULT = 5;
+const EMBEDDING_CACHE_TTL_MS = 10 * 60 * 1000;
+const SEARCH_CACHE_TTL_MS = 2 * 60 * 1000;
+const CHAT_CACHE_TTL_MS = 60 * 1000;
+
+function stableHash(value: string): string {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return String(hash);
+}
+
+function trimText(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, maxChars)}...`;
+}
 
 function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length || a.length === 0) {
@@ -73,12 +91,15 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     throw new Error("Input text is required to generate embeddings.");
   }
 
-  const response = await openai.embeddings.create({
-    model: EMBEDDING_MODEL,
-    input: normalized,
-  });
+  const cacheKey = `embedding:${EMBEDDING_MODEL}:${stableHash(normalized)}`;
+  return getOrSetCache(cacheKey, EMBEDDING_CACHE_TTL_MS, async () => {
+    const response = await openai.embeddings.create({
+      model: EMBEDDING_MODEL,
+      input: normalized,
+    });
 
-  return response.data[0]?.embedding ?? [];
+    return response.data[0]?.embedding ?? [];
+  });
 }
 
 export async function searchKnowledgeBase(
@@ -90,92 +111,106 @@ export async function searchKnowledgeBase(
     return [];
   }
 
-  const queryEmbedding = await generateEmbedding(query);
-  await connectToDatabase();
+  const cacheKey = `kb-search:${stableHash(JSON.stringify({ query, topK, ...options }))}`;
+  return getOrSetCache(cacheKey, SEARCH_CACHE_TTL_MS, async () => {
+    const queryEmbedding = await generateEmbedding(query);
+    await connectToDatabase();
 
-  const filter: {
-    document_id?: Types.ObjectId;
-    "metadata.department_id"?: string;
-  } = {};
+    const filter: {
+      document_id?: Types.ObjectId;
+      "metadata.department_id"?: string;
+    } = {};
 
-  if (options.documentId && Types.ObjectId.isValid(options.documentId)) {
-    filter.document_id = new Types.ObjectId(options.documentId);
-  }
+    if (options.documentId && Types.ObjectId.isValid(options.documentId)) {
+      filter.document_id = new Types.ObjectId(options.documentId);
+    }
 
-  if (options.departmentId) {
-    filter["metadata.department_id"] = options.departmentId;
-  }
+    if (options.departmentId) {
+      filter["metadata.department_id"] = options.departmentId;
+    }
 
-  const chunks = await KnowledgeBaseChunk.find(filter)
-    .select("document_id chunk_text embedding metadata")
-    .lean<
-      Array<{
-        _id: Types.ObjectId;
-        document_id: Types.ObjectId;
-        chunk_text: string;
-        embedding: number[];
-        metadata?: Record<string, unknown>;
-      }>
-    >();
+    const chunks = await KnowledgeBaseChunk.find(filter)
+      .select("document_id chunk_text embedding metadata")
+      .lean<
+        Array<{
+          _id: Types.ObjectId;
+          document_id: Types.ObjectId;
+          chunk_text: string;
+          embedding: number[];
+          metadata?: Record<string, unknown>;
+        }>
+      >();
 
-  const ranked = chunks
-    .map((chunk) => ({
-      chunkId: String(chunk._id),
-      documentId: String(chunk.document_id),
-      chunkText: chunk.chunk_text,
-      score: cosineSimilarity(queryEmbedding, chunk.embedding),
-      metadata: chunk.metadata ?? {},
-    }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topK);
-
-  return ranked;
+    return chunks
+      .map((chunk) => ({
+        chunkId: String(chunk._id),
+        documentId: String(chunk.document_id),
+        chunkText: chunk.chunk_text,
+        score: cosineSimilarity(queryEmbedding, chunk.embedding),
+        metadata: chunk.metadata ?? {},
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, topK);
+  });
 }
 
 export async function generateChatResponse(
   question: string,
   options: ChatOptions = {},
 ): Promise<{ answer: string; context: KnowledgeSearchResult[] }> {
-  const context = await searchKnowledgeBase(question, {
-    topK: options.topK,
-    departmentId: options.departmentId,
-    documentId: options.documentId,
+  const cacheKey = `chat:${stableHash(
+    JSON.stringify({
+      q: question,
+      topK: options.topK,
+      dept: options.departmentId,
+      doc: options.documentId,
+      h: (options.history ?? []).slice(-4),
+    }),
+  )}`;
+
+  return getOrSetCache(cacheKey, CHAT_CACHE_TTL_MS, async () => {
+    const context = await searchKnowledgeBase(question, {
+      topK: options.topK ?? 3,
+      departmentId: options.departmentId,
+      documentId: options.documentId,
+    });
+
+    const systemPrompt =
+      options.systemPrompt ??
+      "You are an academic department assistant. Use only provided context. If missing info, ask user to contact department office.";
+
+    const contextBlock =
+      context.length > 0
+        ? context
+            .map((item, index) => `[C${index + 1}] ${trimText(item.chunkText, 550)}`)
+            .join("\n")
+        : "No relevant context.";
+
+    const historyMessages =
+      (options.history ?? []).slice(-4).map((item) => ({
+        role: item.role,
+        content: trimText(item.content, 220),
+      })) ?? [];
+
+    const completion = await openai.chat.completions.create({
+      model: CHAT_MODEL,
+      temperature: 0.2,
+      max_tokens: 420,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...historyMessages,
+        {
+          role: "user",
+          content: `Context:\n${contextBlock}\nQuestion:\n${trimText(question, 300)}`,
+        },
+      ],
+    });
+
+    return {
+      answer: completion.choices[0]?.message?.content?.trim() ?? "",
+      context,
+    };
   });
-
-  const systemPrompt =
-    options.systemPrompt ??
-    "You are an academic department assistant. Answer using the provided context only. If context is insufficient, instruct the user to contact the department office.";
-
-  const contextBlock =
-    context.length > 0
-      ? context
-          .map((item, index) => `[Context ${index + 1}] ${item.chunkText}`)
-          .join("\n\n")
-      : "No relevant knowledge base context found.";
-
-  const historyMessages =
-    options.history?.map((item) => ({
-      role: item.role,
-      content: item.content,
-    })) ?? [];
-
-  const completion = await openai.chat.completions.create({
-    model: CHAT_MODEL,
-    temperature: 0.2,
-    messages: [
-      { role: "system", content: systemPrompt },
-      ...historyMessages,
-      {
-        role: "user",
-        content: `Context:\n${contextBlock}\n\nQuestion:\n${question}`,
-      },
-    ],
-  });
-
-  return {
-    answer: completion.choices[0]?.message?.content?.trim() ?? "",
-    context,
-  };
 }
 
 export async function generateDocument(

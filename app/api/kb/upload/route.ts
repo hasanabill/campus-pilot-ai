@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { ingestKnowledgeBaseDocument, kbUploadSchema } from "@/services/knowledgeBaseService";
 import { uploadFormFileToCloudinary } from "@/services/storageService";
+import { enforceRateLimit, validateFileUpload } from "@/utils/request";
 
 function inferSourceTypeFromFileName(fileName: string): "pdf" | "docx" | "text" {
   const lower = fileName.toLowerCase();
@@ -13,6 +14,15 @@ function inferSourceTypeFromFileName(fileName: string): "pdf" | "docx" | "text" 
 
 export async function POST(request: Request) {
   try {
+    const rate = enforceRateLimit(request, {
+      name: "kb-upload",
+      windowMs: 60_000,
+      maxRequests: 10,
+    });
+    if (!rate.allowed) {
+      return NextResponse.json({ error: "Too many upload requests." }, { status: 429 });
+    }
+
     const session = await auth();
     if (!session?.user?.id || !session.user.role) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
@@ -38,6 +48,14 @@ export async function POST(request: Request) {
       if (!(file instanceof File)) {
         return NextResponse.json({ error: "file is required in form-data." }, { status: 400 });
       }
+      validateFileUpload(file, {
+        maxBytes: 10 * 1024 * 1024,
+        allowedMimeTypes: [
+          "application/pdf",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "text/plain",
+        ],
+      });
 
       const uploaded = await uploadFormFileToCloudinary(file, {
         folder: "campus-pilot/kb",

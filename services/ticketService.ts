@@ -34,6 +34,7 @@ export const listTicketsQuerySchema = z.object({
   status: z.enum(ticketStatuses).optional(),
   type: z.enum(ticketTypes).optional(),
   limit: z.number().int().min(1).max(100).optional(),
+  page: z.number().int().min(1).optional(),
 });
 
 export const assignTicketSchema = z.object({
@@ -146,18 +147,33 @@ export async function listTickets(requester: Requester, query: z.infer<typeof li
       .select("_id")
       .lean<{ _id: Types.ObjectId } | null>();
     if (!student) {
-      return [];
+      return { tickets: [], total: 0, page: parsed.page ?? 1, limit: parsed.limit ?? 50, total_pages: 0 };
     }
     filter.student_id = student._id;
   }
 
   const limit = parsed.limit ?? 50;
-  const tickets = await Ticket.find(filter)
-    .sort({ created_at: -1 })
-    .limit(limit)
-    .lean();
+  const page = parsed.page ?? 1;
+  const skip = (page - 1) * limit;
+  const [tickets, total] = await Promise.all([
+    Ticket.find(filter)
+      .select(
+        "_id student_id title type priority status assigned_to escalation_level due_date created_at updated_at",
+      )
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    Ticket.countDocuments(filter),
+  ]);
 
-  return tickets;
+  return {
+    tickets,
+    total,
+    page,
+    limit,
+    total_pages: Math.ceil(total / limit),
+  };
 }
 
 export async function getTicketById(requester: Requester, ticketId: string) {

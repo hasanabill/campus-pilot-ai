@@ -33,6 +33,7 @@ export const listSchedulesQuerySchema = z.object({
   semester: z.string().optional(),
   day: z.string().optional(),
   limit: z.number().int().min(1).max(200).optional(),
+  page: z.number().int().min(1).optional(),
 });
 
 function requireObjectId(id: string, field: string): Types.ObjectId {
@@ -237,10 +238,25 @@ export async function listSchedules(query: z.infer<typeof listSchedulesQuerySche
   }
 
   const limit = parsed.limit ?? 100;
-  const schedules = await Schedule.find(filter)
-    .sort({ day: 1, start_time: 1, created_at: -1 })
-    .limit(limit)
-    .lean();
+  const page = parsed.page ?? 1;
+  const skip = (page - 1) * limit;
+  const [schedules, total] = await Promise.all([
+    Schedule.find(filter)
+      .select(
+        "_id schedule_type course_id faculty_id room_id day date start_time end_time semester section status created_at updated_at",
+      )
+      .sort({ day: 1, start_time: 1, created_at: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    Schedule.countDocuments(filter),
+  ]);
 
-  return schedules;
+  return {
+    schedules,
+    total,
+    page,
+    limit,
+    total_pages: Math.ceil(total / limit),
+  };
 }

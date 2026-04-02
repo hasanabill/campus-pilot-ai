@@ -29,6 +29,7 @@ export const listNotificationsQuerySchema = z.object({
   type: z.enum(notificationTypes).optional(),
   is_read: z.boolean().optional(),
   limit: z.number().int().min(1).max(100).optional(),
+  page: z.number().int().min(1).optional(),
 });
 
 function objectIdOrNull(value?: string | null): Types.ObjectId | null {
@@ -75,12 +76,27 @@ export async function listNotificationsForUser(
   if (parsed.type) filter.type = parsed.type;
   if (parsed.is_read !== undefined) filter.is_read = parsed.is_read;
 
-  const notifications = await Notification.find(filter)
-    .sort({ created_at: -1 })
-    .limit(parsed.limit ?? 50)
-    .lean();
+  const limit = parsed.limit ?? 50;
+  const page = parsed.page ?? 1;
+  const skip = (page - 1) * limit;
 
-  return notifications;
+  const [notifications, total] = await Promise.all([
+    Notification.find(filter)
+      .select("type message channel reference_type reference_id is_read sent_at created_at")
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    Notification.countDocuments(filter),
+  ]);
+
+  return {
+    notifications,
+    total,
+    page,
+    limit,
+    total_pages: Math.ceil(total / limit),
+  };
 }
 
 export async function notifyTicketUpdate(params: {

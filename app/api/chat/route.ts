@@ -2,9 +2,19 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { createChatRequestSchema, createChatResponseAndLog } from "@/services/chatService";
+import { enforceRateLimit } from "@/utils/request";
 
 export async function POST(request: Request) {
   try {
+    const rate = enforceRateLimit(request, {
+      name: "chat-post",
+      windowMs: 60_000,
+      maxRequests: 30,
+    });
+    if (!rate.allowed) {
+      return NextResponse.json({ error: "Too many chat requests." }, { status: 429 });
+    }
+
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });

@@ -1,9 +1,25 @@
 import { NextResponse } from "next/server";
 
+import { auth } from "@/lib/auth";
 import { kbSearchSchema, searchKnowledgeBaseEntries } from "@/services/knowledgeBaseService";
+import { enforceRateLimit } from "@/utils/request";
 
 export async function GET(request: Request) {
   try {
+    const rate = enforceRateLimit(request, {
+      name: "kb-search",
+      windowMs: 60_000,
+      maxRequests: 60,
+    });
+    if (!rate.allowed) {
+      return NextResponse.json({ error: "Too many search requests." }, { status: 429 });
+    }
+
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
 
     const parsed = kbSearchSchema.safeParse({

@@ -7,9 +7,19 @@ import {
   listNotificationsForUser,
   listNotificationsQuerySchema,
 } from "@/services/notificationService";
+import { enforceRateLimit } from "@/utils/request";
 
 export async function GET(request: Request) {
   try {
+    const rate = enforceRateLimit(request, {
+      name: "notifications-get",
+      windowMs: 60_000,
+      maxRequests: 80,
+    });
+    if (!rate.allowed) {
+      return NextResponse.json({ error: "Too many requests." }, { status: 429 });
+    }
+
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
@@ -23,6 +33,7 @@ export async function GET(request: Request) {
           ? undefined
           : searchParams.get("is_read") === "true",
       limit: searchParams.get("limit") ? Number(searchParams.get("limit")) : undefined,
+      page: searchParams.get("page") ? Number(searchParams.get("page")) : undefined,
     });
     if (!parsed.success) {
       return NextResponse.json(
@@ -31,8 +42,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const notifications = await listNotificationsForUser(session.user.id, parsed.data);
-    return NextResponse.json({ notifications }, { status: 200 });
+    const result = await listNotificationsForUser(session.user.id, parsed.data);
+    return NextResponse.json(result, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch notifications.";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -41,6 +52,15 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const rate = enforceRateLimit(request, {
+      name: "notifications-post",
+      windowMs: 60_000,
+      maxRequests: 20,
+    });
+    if (!rate.allowed) {
+      return NextResponse.json({ error: "Too many requests." }, { status: 429 });
+    }
+
     const session = await auth();
     if (!session?.user?.id || !session.user.role) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });

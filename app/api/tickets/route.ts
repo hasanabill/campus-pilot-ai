@@ -49,6 +49,7 @@ export async function GET(request: Request) {
       status: searchParams.get("status") ?? undefined,
       type: searchParams.get("type") ?? undefined,
       limit: searchParams.get("limit") ? Number(searchParams.get("limit")) : undefined,
+      page: searchParams.get("page") ? Number(searchParams.get("page")) : undefined,
     });
     if (!parsed.success) {
       return NextResponse.json(
@@ -57,11 +58,11 @@ export async function GET(request: Request) {
       );
     }
 
-    const tickets = await listTickets(
+    const result = await listTickets(
       { userId: session.user.id, role: session.user.role },
       parsed.data,
     );
-    return NextResponse.json({ tickets }, { status: 200 });
+    return NextResponse.json(result, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch tickets.";
     return NextResponse.json({ error: message }, { status: 500 });

@@ -62,6 +62,7 @@ export async function GET(request: Request) {
       semester: searchParams.get("semester") ?? undefined,
       day: searchParams.get("day") ?? undefined,
       limit: searchParams.get("limit") ? Number(searchParams.get("limit")) : undefined,
+      page: searchParams.get("page") ? Number(searchParams.get("page")) : undefined,
     });
     if (!parsed.success) {
       return NextResponse.json(
@@ -70,8 +71,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const schedules = await listSchedules(parsed.data);
-    return NextResponse.json({ schedules }, { status: 200 });
+    const result = await listSchedules(parsed.data);
+    return NextResponse.json(result, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch schedules.";
     return NextResponse.json({ error: message }, { status: 500 });

@@ -6,9 +6,19 @@ import { auth } from "@/lib/auth";
 import { generateDocumentBundle, generateDocumentSchema } from "@/services/documentService";
 import { notifyDocumentApprovalRequired } from "@/services/notificationService";
 import { uploadBufferToCloudinary } from "@/services/storageService";
+import { enforceRateLimit } from "@/utils/request";
 
 export async function POST(request: Request) {
   try {
+    const rate = enforceRateLimit(request, {
+      name: "documents-generate",
+      windowMs: 60_000,
+      maxRequests: 20,
+    });
+    if (!rate.allowed) {
+      return NextResponse.json({ error: "Too many generation requests." }, { status: 429 });
+    }
+
     const session = await auth();
     if (!session?.user?.id || !session.user.role) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
