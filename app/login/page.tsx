@@ -1,7 +1,6 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
@@ -75,10 +74,7 @@ export default function LoginPage() {
         </button>
 
         <p className="text-sm text-zinc-600">
-          No account?{" "}
-          <Link href="/register" className="font-medium text-zinc-900 underline">
-            Register here
-          </Link>
+          Need an account? Contact your department administrator.
         </p>
       </form>
     </main>

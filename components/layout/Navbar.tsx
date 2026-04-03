@@ -38,6 +38,11 @@ export default async function Navbar() {
             <Link href="/tickets/new" className="hover:text-zinc-900">
               New Ticket
             </Link>
+            {session?.user?.role === "admin" ? (
+              <Link href="/register" className="hover:text-zinc-900">
+                Create User
+              </Link>
+            ) : null}
             {isAuthenticated ? (
               <Link href="/dashboard/tickets" className="hover:text-zinc-900">
                 Ticket Admin
@@ -67,20 +72,12 @@ export default async function Navbar() {
               </button>
             </form>
           ) : (
-            <>
-              <Link
-                href="/login"
-                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-100"
-              >
-                Sign in
-              </Link>
-              <Link
-                href="/register"
-                className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700"
-              >
-                Register
-              </Link>
-            </>
+            <Link
+              href="/login"
+              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+            >
+              Sign in
+            </Link>
           )}
         </div>
       </div>
