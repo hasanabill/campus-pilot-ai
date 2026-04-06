@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+
+import InlineAlert from "@/components/ui/InlineAlert";
 
 const roles = ["student", "faculty", "admin", "registrar"] as const;
 
@@ -14,11 +17,13 @@ export default function RegisterFormClient() {
   const [role, setRole] = useState<(typeof roles)[number]>("student");
   const [departmentId, setDepartmentId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setSuccess(null);
     setLoading(true);
 
     const response = await fetch("/api/auth/register", {
@@ -46,6 +51,7 @@ export default function RegisterFormClient() {
     setPassword("");
     setRole("student");
     setDepartmentId("");
+    setSuccess(`Account created successfully for ${email}.`);
     router.refresh();
   }
 
@@ -56,7 +62,9 @@ export default function RegisterFormClient() {
         className="w-full max-w-md space-y-4 rounded-xl border border-zinc-200 bg-white p-6 text-black shadow-sm"
       >
         <h1 className="text-2xl font-semibold text-zinc-900">Create user account</h1>
-        <p className="text-sm text-zinc-600">Admin-only account provisioning</p>
+        <p className="text-sm text-zinc-600">
+          Admin-only account provisioning for student, faculty, admin, and registrar roles.
+        </p>
 
         <label className="block">
           <span className="mb-1 block text-sm text-zinc-700">Name</span>
@@ -117,7 +125,8 @@ export default function RegisterFormClient() {
           />
         </label>
 
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <InlineAlert tone="error" message={error} /> : null}
+        {success ? <InlineAlert tone="success" message={success} /> : null}
 
         <button
           type="submit"
@@ -126,6 +135,13 @@ export default function RegisterFormClient() {
         >
           {loading ? "Creating account..." : "Create Account"}
         </button>
+
+        <div className="flex items-center justify-between text-sm">
+          <Link href="/dashboard" className="text-zinc-600 underline hover:text-zinc-900">
+            Back to dashboard
+          </Link>
+          <span className="text-zinc-500">Admin only</span>
+        </div>
       </form>
     </main>
   );

@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+
+import InlineAlert from "@/components/ui/InlineAlert";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -63,7 +66,7 @@ export default function LoginPage() {
           />
         </label>
 
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <InlineAlert tone="error" message={error} /> : null}
 
         <button
           type="submit"
@@ -73,9 +76,12 @@ export default function LoginPage() {
           {loading ? "Signing in..." : "Sign in"}
         </button>
 
-        <p className="text-sm text-zinc-600">
-          Need an account? Contact your department administrator.
-        </p>
+        <div className="flex items-center justify-between text-sm text-zinc-600">
+          <p>Need an account? Contact your department administrator.</p>
+          <Link href="/" className="underline hover:text-zinc-900">
+            Back home
+          </Link>
+        </div>
       </form>
     </main>
   );
