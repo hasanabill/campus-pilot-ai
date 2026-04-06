@@ -25,7 +25,7 @@ export default function ChatInput({ value, isLoading, onChange, onSubmit }: Chat
         disabled={isLoading || value.trim().length < 2}
         className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
       >
-        Send
+        {isLoading ? "Sending..." : "Send"}
       </button>
     </form>
   );

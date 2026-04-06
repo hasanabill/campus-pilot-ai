@@ -12,9 +12,12 @@ export default function ChatMessageList({ messages, isLoading }: ChatMessageList
   return (
     <div className="h-[55vh] overflow-y-auto rounded-lg border border-zinc-200 bg-white p-4">
       {messages.length === 0 ? (
-        <p className="text-sm text-zinc-500">
-          Start by asking an academic question (courses, regulations, schedules, notices).
-        </p>
+        <div className="rounded-md border border-dashed border-zinc-300 bg-zinc-50 p-3 text-sm text-zinc-600">
+          <p className="font-medium text-zinc-900">Ask about:</p>
+          <p className="mt-1">- course and exam information</p>
+          <p>- regulations, notices, and handbook guidance</p>
+          <p>- service requests and document processes</p>
+        </div>
       ) : null}
 
       <div className="space-y-3">

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import EmptyState from "@/components/ui/EmptyState";
@@ -245,7 +246,11 @@ export default function TicketListClient({ adminMode = false }: TicketListClient
     <section className="space-y-4">
       <PageHeader
         title={adminMode ? "Admin Ticket Dashboard" : "My Tickets"}
-        subtitle={adminMode ? "Track, assign, and escalate ticket workflows." : "Track your submitted requests."}
+        subtitle={
+          adminMode
+            ? "Track, assign, and escalate ticket workflows."
+            : "Only your own tickets are shown. Filter by status/type and use pagination to browse history."
+        }
         actions={
           <>
             {adminMode ? (
@@ -255,7 +260,14 @@ export default function TicketListClient({ adminMode = false }: TicketListClient
               >
                 Run Escalation Sweep
               </button>
-            ) : null}
+            ) : (
+              <Link
+                href="/tickets/new"
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-100"
+              >
+                New Request
+              </Link>
+            )}
             <button
               onClick={() => void loadTickets()}
               className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-100"

@@ -1,17 +1,14 @@
-import { redirect } from "next/navigation";
-
 import ScheduleViewerClient from "@/components/schedules/ScheduleViewerClient";
 import { auth } from "@/lib/auth";
+import { requireAuthenticatedUser } from "@/lib/routeGuards";
 
 export default async function SchedulesPage() {
   const session = await auth();
-  if (!session?.user) {
-    redirect("/login");
-  }
+  const user = requireAuthenticatedUser(session);
 
   return (
-    <main className="mx-auto min-h-screen max-w-6xl bg-zinc-50 p-6">
-      <ScheduleViewerClient />
+    <main className="mx-auto max-w-6xl p-2 md:p-4">
+      <ScheduleViewerClient role={user.role} />
     </main>
   );
 }

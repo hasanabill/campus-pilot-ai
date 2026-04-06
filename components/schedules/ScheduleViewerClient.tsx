@@ -21,7 +21,15 @@ type ScheduleItem = {
   status: string;
 };
 
-export default function ScheduleViewerClient() {
+type AppRole = "student" | "faculty" | "admin" | "registrar";
+
+type ScheduleViewerClientProps = {
+  role?: AppRole;
+};
+
+const dayOptions = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+export default function ScheduleViewerClient({ role }: ScheduleViewerClientProps) {
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
   const [semester, setSemester] = useState("");
   const [day, setDay] = useState("");
@@ -30,6 +38,11 @@ export default function ScheduleViewerClient() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+
+  const isStudentView = role === "student";
+  const subtitle = isStudentView
+    ? "Browse your class/exam schedule. Use filters to find specific days or semester entries."
+    : "View and filter schedule records.";
 
   const loadSchedules = useCallback(async () => {
     setLoading(true);
@@ -89,7 +102,7 @@ export default function ScheduleViewerClient() {
 
   return (
     <section className="space-y-4">
-      <PageHeader title="Schedule Viewer" subtitle="View and filter schedule records." />
+      <PageHeader title="Schedule Viewer" subtitle={subtitle} />
 
       <FilterBar>
         <input
@@ -101,28 +114,56 @@ export default function ScheduleViewerClient() {
           placeholder="Filter by semester"
           className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
         />
-        <input
+        <select
           value={day}
           onChange={(event) => {
             setDay(event.target.value);
             setPage(1);
           }}
-          placeholder="Filter by day"
-          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
-        />
+          className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm"
+        >
+          <option value="">All days</option>
+          {dayOptions.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
         <button
           onClick={() => void loadSchedules()}
           className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100"
         >
           Refresh
         </button>
-        <div className="ml-auto text-xs text-zinc-500">Total: {totalItems}</div>
+        {semester || day ? (
+          <button
+            type="button"
+            onClick={() => {
+              setSemester("");
+              setDay("");
+              setPage(1);
+            }}
+            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100"
+          >
+            Clear Filters
+          </button>
+        ) : null}
+        <div className="ml-auto text-xs text-zinc-500">
+          Showing {schedules.length} of {totalItems}
+        </div>
       </FilterBar>
 
       {loading ? <InlineAlert tone="info" message="Loading schedules..." /> : null}
       {error ? <InlineAlert tone="error" message={error} /> : null}
       {!loading && schedules.length === 0 ? (
-        <EmptyState title="No schedules found" description="Try adjusting filters." />
+        <EmptyState
+          title="No schedules found"
+          description={
+            isStudentView
+              ? "No matching schedule rows for your current filters. Try another day or semester."
+              : "Try adjusting filters."
+          }
+        />
       ) : null}
 
       {!loading && schedules.length > 0 ? (
