@@ -1,5 +1,9 @@
 import { redirect } from "next/navigation";
 
+import EmptyState from "@/components/ui/EmptyState";
+import MetricCard from "@/components/ui/MetricCard";
+import PageHeader from "@/components/ui/PageHeader";
+import StatusBadge from "@/components/ui/StatusBadge";
 import { auth } from "@/lib/auth";
 import { getDashboardOverview } from "@/services/dashboardService";
 
@@ -16,41 +20,22 @@ export default async function DashboardPage() {
   });
 
   return (
-    <main className="mx-auto min-h-screen max-w-6xl p-6">
-      <h1 className="text-3xl font-bold">Dashboard</h1>
-      <p className="mt-2 text-zinc-600">System overview and recent activity.</p>
+    <main className="mx-auto max-w-6xl p-2 md:p-4">
+      <PageHeader title="Dashboard" subtitle="System overview and recent activity." />
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-lg border border-zinc-200 bg-white p-4">
-          <p className="text-sm text-zinc-600">Tickets</p>
-          <p className="mt-1 text-2xl font-semibold text-zinc-900">
-            {overview.metrics.tickets_total}
-          </p>
-        </div>
-        <div className="rounded-lg border border-zinc-200 bg-white p-4">
-          <p className="text-sm text-zinc-600">Chatbot Usage</p>
-          <p className="mt-1 text-2xl font-semibold text-zinc-900">
-            {overview.metrics.chatbot_usage_total}
-          </p>
-        </div>
-        <div className="rounded-lg border border-zinc-200 bg-white p-4">
-          <p className="text-sm text-zinc-600">Pending Approvals</p>
-          <p className="mt-1 text-2xl font-semibold text-zinc-900">
-            {overview.metrics.pending_approvals}
-          </p>
-        </div>
-        <div className="rounded-lg border border-zinc-200 bg-white p-4">
-          <p className="text-sm text-zinc-600">Recent Activity Items</p>
-          <p className="mt-1 text-2xl font-semibold text-zinc-900">
-            {overview.metrics.system_activity_events}
-          </p>
-        </div>
+        <MetricCard label="Tickets" value={overview.metrics.tickets_total} />
+        <MetricCard label="Chatbot Usage" value={overview.metrics.chatbot_usage_total} />
+        <MetricCard label="Pending Approvals" value={overview.metrics.pending_approvals} />
+        <MetricCard label="Recent Activity Items" value={overview.metrics.system_activity_events} />
       </div>
 
       <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-lg font-semibold text-zinc-900">Recent Activity</h2>
         {overview.activity.length === 0 ? (
-          <p className="mt-3 text-sm text-zinc-600">No recent activity.</p>
+          <div className="mt-3">
+            <EmptyState title="No recent activity" description="Recent events will appear here." />
+          </div>
         ) : (
           <ul className="mt-3 space-y-2">
             {overview.activity.map((item, index) => (
@@ -59,9 +44,10 @@ export default async function DashboardPage() {
                 className="rounded-md border border-zinc-100 bg-zinc-50 p-3"
               >
                 <p className="text-sm font-medium text-zinc-900">{item.description}</p>
-                <p className="mt-1 text-xs uppercase tracking-wide text-zinc-500">
-                  {item.type} • {new Date(item.timestamp).toLocaleString()}
-                </p>
+                <div className="mt-1 flex items-center gap-2 text-xs uppercase tracking-wide text-zinc-500">
+                  <StatusBadge label={item.type} tone="muted" />
+                  <span>{new Date(item.timestamp).toLocaleString()}</span>
+                </div>
               </li>
             ))}
           </ul>
