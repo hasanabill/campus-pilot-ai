@@ -18,6 +18,7 @@ type TicketItem = {
   status: string;
   assigned_to?: string | null;
   escalation_level?: number;
+  due_date?: string | null;
   created_at?: string;
 };
 
@@ -33,6 +34,8 @@ export default function TicketListClient({ adminMode = false }: TicketListClient
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [showOverdueOnly, setShowOverdueOnly] = useState(false);
+  const [assigneeDrafts, setAssigneeDrafts] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [page, setPage] = useState(1);
@@ -61,6 +64,12 @@ export default function TicketListClient({ adminMode = false }: TicketListClient
         throw new Error(payload.error ?? "Failed to load tickets.");
       }
       setTickets(payload.tickets ?? []);
+      setAssigneeDrafts(
+        (payload.tickets ?? []).reduce<Record<string, string>>((acc, item) => {
+          acc[item._id] = item.assigned_to ?? "";
+          return acc;
+        }, {}),
+      );
       setTotalPages(payload.total_pages ?? 1);
       setTotalItems(payload.total ?? 0);
     } catch (loadError) {
@@ -121,6 +130,9 @@ export default function TicketListClient({ adminMode = false }: TicketListClient
     setError(null);
     setMessage(null);
     try {
+      const confirmed = window.confirm("Escalate this ticket now?");
+      if (!confirmed) return;
+
       const response = await fetch(`/api/tickets/${ticketId}/escalate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -142,6 +154,11 @@ export default function TicketListClient({ adminMode = false }: TicketListClient
     setError(null);
     setMessage(null);
     try {
+      const confirmed = window.confirm(
+        "Run escalation sweep for all overdue pending/in-review/approved tickets?",
+      );
+      if (!confirmed) return;
+
       const response = await fetch("/api/tickets/escalate", { method: "POST" });
       const payload = (await response.json()) as { error?: string; escalated_count?: number };
       if (!response.ok) {
@@ -155,6 +172,21 @@ export default function TicketListClient({ adminMode = false }: TicketListClient
     }
   }
 
+  function isOverdue(ticket: TicketItem): boolean {
+    if (!ticket.due_date) return false;
+    const due = new Date(ticket.due_date).getTime();
+    if (Number.isNaN(due)) return false;
+    return due < Date.now() && ["pending", "in_review", "approved"].includes(ticket.status);
+  }
+
+  const overdueCount = tickets.filter(isOverdue).length;
+  const escalatedCount = tickets.filter((item) => item.status === "escalated").length;
+  const highPriorityCount = tickets.filter((item) =>
+    ["high", "urgent"].includes(item.priority),
+  ).length;
+  const displayedTickets =
+    adminMode && showOverdueOnly ? tickets.filter((item) => isOverdue(item)) : tickets;
+
   const baseColumns = [
     {
       key: "title",
@@ -167,6 +199,18 @@ export default function TicketListClient({ adminMode = false }: TicketListClient
       key: "status",
       label: "Status",
       render: (ticket: TicketItem) => <StatusBadge label={ticket.status} />,
+    },
+    {
+      key: "due_date",
+      label: "Due Date",
+      render: (ticket: TicketItem) =>
+        ticket.due_date ? (
+          <span className={isOverdue(ticket) ? "font-medium text-red-700" : ""}>
+            {new Date(ticket.due_date).toLocaleDateString()}
+          </span>
+        ) : (
+          "-"
+        ),
     },
   ];
 
@@ -214,17 +258,26 @@ export default function TicketListClient({ adminMode = false }: TicketListClient
                   </option>
                 ))}
               </select>
+              <input
+                value={assigneeDrafts[ticket._id] ?? ""}
+                onChange={(event) =>
+                  setAssigneeDrafts((prev) => ({
+                    ...prev,
+                    [ticket._id]: event.target.value,
+                  }))
+                }
+                placeholder="Assignee user ID"
+                className="w-36 rounded-md border border-zinc-300 px-2 py-1 text-xs"
+              />
               <button
                 onClick={() => {
-                  const assignedTo = window.prompt(
-                    "Enter assignee user ID (ObjectId):",
-                    ticket.assigned_to ?? "",
-                  );
+                  const assignedTo = assigneeDrafts[ticket._id];
                   if (assignedTo && assignedTo.trim()) {
                     void assignTicket(ticket._id, assignedTo.trim());
                   }
                 }}
-                className="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100"
+                disabled={!assigneeDrafts[ticket._id]?.trim()}
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Assign
               </button>
@@ -278,6 +331,23 @@ export default function TicketListClient({ adminMode = false }: TicketListClient
         }
       />
 
+      {adminMode ? (
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+            <p className="text-xs uppercase tracking-wide text-red-700">Overdue Attention</p>
+            <p className="mt-1 text-2xl font-semibold text-red-800">{overdueCount}</p>
+          </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="text-xs uppercase tracking-wide text-amber-700">High / Urgent</p>
+            <p className="mt-1 text-2xl font-semibold text-amber-800">{highPriorityCount}</p>
+          </div>
+          <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
+            <p className="text-xs uppercase tracking-wide text-sky-700">Escalated Queue</p>
+            <p className="mt-1 text-2xl font-semibold text-sky-800">{escalatedCount}</p>
+          </div>
+        </div>
+      ) : null}
+
       <FilterBar>
         <select
           value={statusFilter}
@@ -310,24 +380,37 @@ export default function TicketListClient({ adminMode = false }: TicketListClient
           ))}
         </select>
         <div className="ml-auto text-xs text-zinc-500">Total: {totalItems}</div>
+        {adminMode ? (
+          <button
+            type="button"
+            onClick={() => setShowOverdueOnly((prev) => !prev)}
+            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100"
+          >
+            {showOverdueOnly ? "Show All" : "Show Overdue Only"}
+          </button>
+        ) : null}
       </FilterBar>
 
       {loading ? <InlineAlert tone="info" message="Loading tickets..." /> : null}
       {error ? <InlineAlert tone="error" message={error} /> : null}
       {message ? <InlineAlert tone="success" message={message} /> : null}
 
-      {!loading && tickets.length === 0 ? (
+      {!loading && displayedTickets.length === 0 ? (
         <EmptyState
-          title="No tickets found"
-          description="Try adjusting filters or create a new request."
+          title={showOverdueOnly ? "No overdue tickets in this page" : "No tickets found"}
+          description={
+            showOverdueOnly
+              ? "Try another page or remove overdue-only mode."
+              : "Try adjusting filters or create a new request."
+          }
         />
       ) : null}
 
-      {!loading && tickets.length > 0 ? (
+      {!loading && displayedTickets.length > 0 ? (
         <>
           <EntityTable
             columns={columns}
-            rows={tickets}
+            rows={displayedTickets}
             rowKey={(row) => row._id}
             minWidthClassName={adminMode ? "min-w-[980px]" : "min-w-[720px]"}
           />

@@ -8,7 +8,7 @@ export default async function AdminSchedulesPage() {
   requireAnyRole(user.role, ["admin"]);
 
   return (
-    <main className="mx-auto min-h-screen max-w-6xl bg-zinc-50 p-6">
+    <main className="mx-auto max-w-6xl p-2 md:p-4">
       <ScheduleEditorForm />
     </main>
   );

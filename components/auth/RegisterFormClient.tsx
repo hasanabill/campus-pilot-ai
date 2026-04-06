@@ -7,6 +7,12 @@ import { FormEvent, useState } from "react";
 import InlineAlert from "@/components/ui/InlineAlert";
 
 const roles = ["student", "faculty", "admin", "registrar"] as const;
+const roleHelpText: Record<(typeof roles)[number], string> = {
+  student: "Student: can submit/track requests, view schedules, and use chat assistant.",
+  faculty: "Faculty: can manage ticket workflow, review schedules, and view reports.",
+  admin: "Admin: can manage schedules/tickets, provision users, and run operations.",
+  registrar: "Registrar: can access reporting and approval-oriented workflows.",
+};
 
 export default function RegisterFormClient() {
   const router = useRouter();
@@ -19,11 +25,23 @@ export default function RegisterFormClient() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setSuccess(null);
+    setFieldErrors({});
+
+    if (!email.includes("@")) {
+      setFieldErrors({ email: "Enter a valid email address." });
+      return;
+    }
+    if (password.length < 8) {
+      setFieldErrors({ password: "Password must be at least 8 characters." });
+      return;
+    }
+
     setLoading(true);
 
     const response = await fetch("/api/auth/register", {
@@ -42,16 +60,22 @@ export default function RegisterFormClient() {
 
     if (!response.ok) {
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(payload?.error ?? "Account creation failed.");
+      if (response.status === 409) {
+        setError("An account with this email already exists.");
+      } else {
+        setError(payload?.error ?? "Account creation failed.");
+      }
       return;
     }
 
+    const createdEmail = email;
+    const createdRole = role;
     setName("");
     setEmail("");
     setPassword("");
     setRole("student");
     setDepartmentId("");
-    setSuccess(`Account created successfully for ${email}.`);
+    setSuccess(`Account created successfully for ${createdEmail} (${createdRole}).`);
     router.refresh();
   }
 
@@ -84,8 +108,11 @@ export default function RegisterFormClient() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full rounded-md border border-zinc-300 px-3 py-2 outline-none focus:border-zinc-500"
+            className={`w-full rounded-md border px-3 py-2 outline-none focus:border-zinc-500 ${
+              fieldErrors.email ? "border-red-300" : "border-zinc-300"
+            }`}
           />
+          {fieldErrors.email ? <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p> : null}
         </label>
 
         <label className="block">
@@ -96,8 +123,18 @@ export default function RegisterFormClient() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="w-full rounded-md border border-zinc-300 px-3 py-2 outline-none focus:border-zinc-500"
+            className={`w-full rounded-md border px-3 py-2 outline-none focus:border-zinc-500 ${
+              fieldErrors.password ? "border-red-300" : "border-zinc-300"
+            }`}
           />
+          <div className="mt-1 flex items-center justify-between">
+            {fieldErrors.password ? (
+              <p className="text-xs text-red-600">{fieldErrors.password}</p>
+            ) : (
+              <p className="text-xs text-zinc-500">Use a temporary password and share securely.</p>
+            )}
+            <p className="text-xs text-zinc-500">{password.length}/8 min</p>
+          </div>
         </label>
 
         <label className="block">
@@ -113,6 +150,7 @@ export default function RegisterFormClient() {
               </option>
             ))}
           </select>
+          <p className="mt-1 text-xs text-zinc-500">{roleHelpText[role]}</p>
         </label>
 
         <label className="block">

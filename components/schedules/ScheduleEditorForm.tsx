@@ -2,8 +2,13 @@
 
 import { FormEvent, useState } from "react";
 
+import InlineAlert from "@/components/ui/InlineAlert";
+import PageHeader from "@/components/ui/PageHeader";
+import StatusBadge from "@/components/ui/StatusBadge";
+
 const scheduleTypes = ["class", "exam"] as const;
 const scheduleStatuses = ["draft", "published", "updated", "cancelled"] as const;
+const dayOptions = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 type ConflictWarning = {
   type: "room_conflict" | "faculty_conflict" | "time_conflict";
   conflicting_schedule_id: string;
@@ -26,12 +31,16 @@ export default function ScheduleEditorForm() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<ConflictWarning[]>([]);
+  const [attemptedOverride, setAttemptedOverride] = useState(false);
 
   async function submitSchedule(allowConflicts = false) {
     setLoading(true);
     setError(null);
     setMessage(null);
-    setWarnings([]);
+    if (!allowConflicts) {
+      setWarnings([]);
+      setAttemptedOverride(false);
+    }
 
     try {
       const response = await fetch("/api/schedules", {
@@ -79,6 +88,7 @@ export default function ScheduleEditorForm() {
       setSection("");
       setStatus("draft");
       setWarnings([]);
+      setAttemptedOverride(false);
     } catch (submitError) {
       const msg = submitError instanceof Error ? submitError.message : "Schedule creation failed.";
       setError(msg);
@@ -92,9 +102,20 @@ export default function ScheduleEditorForm() {
     void submitSchedule(false);
   }
 
+  function warningTone(type: ConflictWarning["type"]): "warning" | "danger" | "info" {
+    if (type === "faculty_conflict" || type === "room_conflict") return "danger";
+    return "warning";
+  }
+
   return (
     <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-zinc-200 bg-white p-5">
-      <h2 className="text-xl font-semibold text-zinc-900">Schedule Editor (Admin)</h2>
+      <PageHeader
+        title="Schedule Editor (Admin)"
+        subtitle="Create class/exam schedules, review conflict warnings, and override only when operationally required."
+      />
+
+      {message ? <InlineAlert tone="success" message={message} /> : null}
+      {error ? <InlineAlert tone="error" message={error} /> : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
@@ -141,7 +162,19 @@ export default function ScheduleEditorForm() {
         </label>
         <label className="block">
           <span className="mb-1 block text-sm text-zinc-700">Day</span>
-          <input value={day} onChange={(e) => setDay(e.target.value)} required className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm" />
+          <select
+            value={day}
+            onChange={(e) => setDay(e.target.value)}
+            required
+            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+          >
+            <option value="">Select day</option>
+            {dayOptions.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="block">
           <span className="mb-1 block text-sm text-zinc-700">Date (optional)</span>
@@ -175,26 +208,53 @@ export default function ScheduleEditorForm() {
 
       {warnings.length > 0 ? (
         <div className="rounded-md border border-amber-300 bg-amber-50 p-3">
-          <p className="text-sm font-medium text-amber-900">Conflict warnings</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800">
+          <p className="text-sm font-medium text-amber-900">Conflict warnings detected</p>
+          <p className="mt-1 text-xs text-amber-800">
+            Review each warning before overriding. Conflicts can cause room and faculty collisions.
+          </p>
+          <ul className="mt-3 space-y-2 text-sm text-amber-900">
             {warnings.map((warning, index) => (
-              <li key={`${warning.conflicting_schedule_id}-${index}`}>
-                [{warning.type}] {warning.message}
+              <li
+                key={`${warning.conflicting_schedule_id}-${index}`}
+                className="rounded border border-amber-200 bg-amber-100/70 p-2"
+              >
+                <div className="mb-1">
+                  <StatusBadge label={warning.type} tone={warningTone(warning.type)} />
+                </div>
+                <p>{warning.message}</p>
+                <p className="mt-1 text-xs text-amber-800">
+                  Related schedule: {warning.conflicting_schedule_id}
+                </p>
               </li>
             ))}
           </ul>
-          <button
-            type="button"
-            onClick={() => void submitSchedule(true)}
-            className="mt-3 rounded-md border border-amber-400 px-3 py-1.5 text-sm text-amber-900 hover:bg-amber-100"
-          >
-            Create Anyway (Allow Conflicts)
-          </button>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setAttemptedOverride(true);
+                const confirmed = window.confirm(
+                  "Create schedule with conflicts? This should be used only for urgent operational cases.",
+                );
+                if (confirmed) {
+                  void submitSchedule(true);
+                }
+              }}
+              className="rounded-md border border-amber-400 px-3 py-1.5 text-sm text-amber-900 hover:bg-amber-100"
+            >
+              Create Anyway (Allow Conflicts)
+            </button>
+            <span className="text-xs text-amber-900">
+              Recommended: adjust day/time/room/faculty and submit again.
+            </span>
+          </div>
+          {attemptedOverride ? (
+            <p className="mt-2 text-xs text-amber-900">
+              Override attempt recorded in UI flow. Confirm only when necessary.
+            </p>
+          ) : null}
         </div>
       ) : null}
-
-      {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </form>
   );
 }
