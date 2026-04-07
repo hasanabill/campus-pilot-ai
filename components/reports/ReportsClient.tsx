@@ -54,9 +54,11 @@ export default function ReportsClient() {
   const [message, setMessage] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [periodStart, setPeriodStart] = useState(() =>
-    toDateInputValue(new Date(Date.now() - 29 * 24 * 60 * 60 * 1000)),
+    toDateInputValue(new Date(Date.now() - 29 * 24 * 60 * 60 * 1000))
   );
-  const [periodEnd, setPeriodEnd] = useState(() => toDateInputValue(new Date()));
+  const [periodEnd, setPeriodEnd] = useState(() =>
+    toDateInputValue(new Date())
+  );
 
   function summaryQueryString() {
     const query = new URLSearchParams();
@@ -73,14 +75,22 @@ export default function ReportsClient() {
     setBusyAction(action);
     try {
       const query = summaryQueryString();
-      const response = await fetch(`/api/reports/summary${query ? `?${query}` : ""}`);
-      const payload = (await response.json()) as { summary?: ReportSummary; error?: string };
+      const response = await fetch(
+        `/api/reports/summary${query ? `?${query}` : ""}`
+      );
+      const payload = (await response.json()) as {
+        summary?: ReportSummary;
+        error?: string;
+      };
       if (!response.ok || !payload.summary) {
         throw new Error(payload.error ?? "Failed to load report summary.");
       }
       setSummary(payload.summary);
     } catch (loadError) {
-      const msg = loadError instanceof Error ? loadError.message : "Failed to load report summary.";
+      const msg =
+        loadError instanceof Error
+          ? loadError.message
+          : "Failed to load report summary.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -112,7 +122,9 @@ export default function ReportsClient() {
       await loadSummary(null);
     } catch (generateError) {
       const msg =
-        generateError instanceof Error ? generateError.message : "Failed to generate report.";
+        generateError instanceof Error
+          ? generateError.message
+          : "Failed to generate report.";
       setError(msg);
     } finally {
       setBusyAction(null);
@@ -153,7 +165,9 @@ export default function ReportsClient() {
                 disabled={busyAction !== null}
                 className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {busyAction === "generate" ? "Generating..." : "Generate Snapshot"}
+                {busyAction === "generate"
+                  ? "Generating..."
+                  : "Generate Snapshot"}
               </button>
               <button
                 onClick={exportCsv}
@@ -197,7 +211,10 @@ export default function ReportsClient() {
         {loading ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="rounded-lg border border-zinc-200 p-4">
+              <div
+                key={index}
+                className="rounded-lg border border-zinc-200 p-4"
+              >
                 <div className="h-4 w-28 animate-pulse rounded bg-zinc-200" />
                 <div className="mt-2 h-8 w-16 animate-pulse rounded bg-zinc-200" />
               </div>
@@ -232,25 +249,47 @@ export default function ReportsClient() {
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div className="rounded-lg border border-zinc-200 p-4">
-                <h3 className="text-sm font-semibold text-zinc-900">Ticket Status Breakdown</h3>
+                <h3 className="text-sm font-semibold text-zinc-900">
+                  Ticket Status Breakdown
+                </h3>
                 <ul className="mt-2 space-y-1 text-sm text-zinc-700">
-                  {topEntries(summary.ticket_stats.by_status).map(([key, count]) => (
-                    <li key={key} className="flex items-center justify-between">
-                      <span className="capitalize">{key.replaceAll("_", " ")}</span>
-                      <span className="font-medium text-zinc-900">{count}</span>
-                    </li>
-                  ))}
+                  {topEntries(summary.ticket_stats.by_status).map(
+                    ([key, count]) => (
+                      <li
+                        key={key}
+                        className="flex items-center justify-between"
+                      >
+                        <span className="capitalize">
+                          {key.replaceAll("_", " ")}
+                        </span>
+                        <span className="font-medium text-zinc-900">
+                          {count}
+                        </span>
+                      </li>
+                    )
+                  )}
                 </ul>
               </div>
               <div className="rounded-lg border border-zinc-200 p-4">
-                <h3 className="text-sm font-semibold text-zinc-900">Ticket Type Breakdown</h3>
+                <h3 className="text-sm font-semibold text-zinc-900">
+                  Ticket Type Breakdown
+                </h3>
                 <ul className="mt-2 space-y-1 text-sm text-zinc-700">
-                  {topEntries(summary.ticket_stats.by_type).map(([key, count]) => (
-                    <li key={key} className="flex items-center justify-between">
-                      <span className="capitalize">{key.replaceAll("_", " ")}</span>
-                      <span className="font-medium text-zinc-900">{count}</span>
-                    </li>
-                  ))}
+                  {topEntries(summary.ticket_stats.by_type).map(
+                    ([key, count]) => (
+                      <li
+                        key={key}
+                        className="flex items-center justify-between"
+                      >
+                        <span className="capitalize">
+                          {key.replaceAll("_", " ")}
+                        </span>
+                        <span className="font-medium text-zinc-900">
+                          {count}
+                        </span>
+                      </li>
+                    )
+                  )}
                 </ul>
               </div>
             </div>

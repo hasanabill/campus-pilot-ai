@@ -6,7 +6,10 @@ import MetricCard from "@/components/ui/MetricCard";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { auth } from "@/lib/auth";
-import { getDashboardOverview, getStudentDashboardOverview } from "@/services/dashboardService";
+import {
+  getDashboardOverview,
+  getStudentDashboardOverview,
+} from "@/services/dashboardService";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -20,12 +23,24 @@ export default async function DashboardPage() {
 
     return (
       <main className="mx-auto max-w-6xl p-2 md:p-4">
-        <PageHeader title="Student Dashboard" subtitle="Your requests, notifications, and upcoming schedule." />
+        <PageHeader
+          title="Student Dashboard"
+          subtitle="Your requests, notifications, and upcoming schedule."
+        />
 
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <MetricCard label="My Open Tickets" value={studentOverview.metrics.my_open_tickets} />
-          <MetricCard label="Unread Notifications" value={studentOverview.metrics.unread_notifications} />
-          <MetricCard label="Total Notifications" value={studentOverview.metrics.notifications_total} />
+          <MetricCard
+            label="My Open Tickets"
+            value={studentOverview.metrics.my_open_tickets}
+          />
+          <MetricCard
+            label="Unread Notifications"
+            value={studentOverview.metrics.unread_notifications}
+          />
+          <MetricCard
+            label="Total Notifications"
+            value={studentOverview.metrics.notifications_total}
+          />
         </div>
 
         <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4">
@@ -59,7 +74,9 @@ export default async function DashboardPage() {
         </div>
 
         <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4">
-          <h2 className="text-lg font-semibold text-zinc-900">Upcoming Schedule Snippet</h2>
+          <h2 className="text-lg font-semibold text-zinc-900">
+            Upcoming Schedule Snippet
+          </h2>
           {!studentOverview.upcoming_schedule.has_item ? (
             <div className="mt-3">
               <EmptyState
@@ -75,7 +92,8 @@ export default async function DashboardPage() {
               </p>
               <p>
                 <span className="font-medium text-zinc-900">Time:</span>{" "}
-                {studentOverview.upcoming_schedule.start_time} - {studentOverview.upcoming_schedule.end_time}
+                {studentOverview.upcoming_schedule.start_time} -{" "}
+                {studentOverview.upcoming_schedule.end_time}
               </p>
               <p>
                 <span className="font-medium text-zinc-900">Semester:</span>{" "}
@@ -86,25 +104,40 @@ export default async function DashboardPage() {
                 {studentOverview.upcoming_schedule.section}
               </p>
               <div className="mt-1">
-                <StatusBadge label={studentOverview.upcoming_schedule.status ?? "unknown"} />
+                <StatusBadge
+                  label={studentOverview.upcoming_schedule.status ?? "unknown"}
+                />
               </div>
             </div>
           )}
         </div>
 
         <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4">
-          <h2 className="text-lg font-semibold text-zinc-900">Recent Notifications</h2>
+          <h2 className="text-lg font-semibold text-zinc-900">
+            Recent Notifications
+          </h2>
           {studentOverview.recent_notifications.length === 0 ? (
             <div className="mt-3">
-              <EmptyState title="No notifications yet" description="New updates will show here." />
+              <EmptyState
+                title="No notifications yet"
+                description="New updates will show here."
+              />
             </div>
           ) : (
             <ul className="mt-3 space-y-2">
               {studentOverview.recent_notifications.map((item) => (
-                <li key={item.id} className="rounded-md border border-zinc-100 bg-zinc-50 p-3">
-                  <p className="text-sm font-medium text-zinc-900">{item.message}</p>
+                <li
+                  key={item.id}
+                  className="rounded-md border border-zinc-100 bg-zinc-50 p-3"
+                >
+                  <p className="text-sm font-medium text-zinc-900">
+                    {item.message}
+                  </p>
                   <div className="mt-1 flex items-center gap-2 text-xs uppercase tracking-wide text-zinc-500">
-                    <StatusBadge label={item.type} tone={item.is_read ? "muted" : "info"} />
+                    <StatusBadge
+                      label={item.type}
+                      tone={item.is_read ? "muted" : "info"}
+                    />
                     <span>{new Date(item.timestamp).toLocaleString()}</span>
                   </div>
                 </li>
@@ -123,20 +156,35 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-6xl p-2 md:p-4">
-      <PageHeader title="Dashboard" subtitle="System overview and recent activity." />
+      <PageHeader
+        title="Dashboard"
+        subtitle="System overview and recent activity."
+      />
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Tickets" value={overview.metrics.tickets_total} />
-        <MetricCard label="Chatbot Usage" value={overview.metrics.chatbot_usage_total} />
-        <MetricCard label="Pending Approvals" value={overview.metrics.pending_approvals} />
-        <MetricCard label="Recent Activity Items" value={overview.metrics.system_activity_events} />
+        <MetricCard
+          label="Chatbot Usage"
+          value={overview.metrics.chatbot_usage_total}
+        />
+        <MetricCard
+          label="Pending Approvals"
+          value={overview.metrics.pending_approvals}
+        />
+        <MetricCard
+          label="Recent Activity Items"
+          value={overview.metrics.system_activity_events}
+        />
       </div>
 
       <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4">
         <h2 className="text-lg font-semibold text-zinc-900">Recent Activity</h2>
         {overview.activity.length === 0 ? (
           <div className="mt-3">
-            <EmptyState title="No recent activity" description="Recent events will appear here." />
+            <EmptyState
+              title="No recent activity"
+              description="Recent events will appear here."
+            />
           </div>
         ) : (
           <ul className="mt-3 space-y-2">
@@ -145,7 +193,9 @@ export default async function DashboardPage() {
                 key={`${item.type}-${item.timestamp}-${index}`}
                 className="rounded-md border border-zinc-100 bg-zinc-50 p-3"
               >
-                <p className="text-sm font-medium text-zinc-900">{item.description}</p>
+                <p className="text-sm font-medium text-zinc-900">
+                  {item.description}
+                </p>
                 <div className="mt-1 flex items-center gap-2 text-xs uppercase tracking-wide text-zinc-500">
                   <StatusBadge label={item.type} tone="muted" />
                   <span>{new Date(item.timestamp).toLocaleString()}</span>
@@ -156,7 +206,7 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4">
+      <div className="mt-6 rounded-lg border text-zinc-900 border-zinc-200 bg-white p-4">
         <p>
           <span className="font-semibold">Name:</span> {session.user.name}
         </p>

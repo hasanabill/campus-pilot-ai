@@ -23,11 +23,15 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", roles: ["student", "faculty", "admin", "registrar"] },
   { href: "/chat", label: "Chat", roles: ["student", "faculty", "admin", "registrar"] },
+  { href: "/notifications", label: "Notifications", roles: ["student", "faculty", "admin", "registrar"] },
   { href: "/tickets/new", label: "New Request", roles: ["student"] },
   { href: "/tickets", label: "My Tickets", roles: ["student"] },
   { href: "/dashboard/tickets", label: "Ticket Management", roles: ["faculty", "admin", "registrar"] },
   { href: "/schedules", label: "Schedules", roles: ["student", "faculty", "admin", "registrar"] },
   { href: "/dashboard/schedules", label: "Schedule Admin", roles: ["admin"] },
+  { href: "/dashboard/kb", label: "KB Upload", roles: ["admin"] },
+  { href: "/dashboard/documents", label: "Document Center", roles: ["faculty", "admin", "registrar"] },
+  { href: "/dashboard/approvals", label: "Approvals", roles: ["admin", "registrar"] },
   { href: "/dashboard/reports", label: "Reports", roles: ["faculty", "admin", "registrar"] },
   { href: "/register", label: "Create User", roles: ["admin"] },
 ];
@@ -114,9 +118,12 @@ export default function AppShellClient({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="rounded-md border border-zinc-300 px-2.5 py-1.5 text-xs text-zinc-600">
+            <Link
+              href="/notifications"
+              className="rounded-md border border-zinc-300 px-2.5 py-1.5 text-xs text-zinc-600 hover:bg-zinc-100"
+            >
               Notifications
-            </span>
+            </Link>
             <span className="hidden text-xs text-zinc-500 md:inline">{user.name}</span>
             <button
               type="button"
