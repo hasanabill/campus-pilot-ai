@@ -22,9 +22,12 @@ export default function EntityTable<T>({
     <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
       <table className={`w-full text-left text-sm ${minWidthClassName}`}>
         <thead>
-          <tr className="border-b border-zinc-200 text-zinc-600">
+          <tr className="border-b border-zinc-200 text-zinc-900">
             {columns.map((column) => (
-              <th key={column.key} className={`px-3 py-2 ${column.className ?? ""}`}>
+              <th
+                key={column.key}
+                className={`px-3 py-2 ${column.className ?? ""}`}
+              >
                 {column.label}
               </th>
             ))}
@@ -32,9 +35,15 @@ export default function EntityTable<T>({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={rowKey(row)} className="border-b border-zinc-100 last:border-b-0">
+            <tr
+              key={rowKey(row)}
+              className="border-b border-zinc-100 last:border-b-0"
+            >
               {columns.map((column) => (
-                <td key={column.key} className={`px-3 py-2 align-top ${column.className ?? ""}`}>
+                <td
+                  key={column.key}
+                  className={`px-3 py-2 align-top ${column.className ?? ""}`}
+                >
                   {column.render(row)}
                 </td>
               ))}

@@ -27,9 +27,19 @@ type ScheduleViewerClientProps = {
   role?: AppRole;
 };
 
-const dayOptions = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const dayOptions = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
-export default function ScheduleViewerClient({ role }: ScheduleViewerClientProps) {
+export default function ScheduleViewerClient({
+  role,
+}: ScheduleViewerClientProps) {
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
   const [semester, setSemester] = useState("");
   const [day, setDay] = useState("");
@@ -71,7 +81,10 @@ export default function ScheduleViewerClient({ role }: ScheduleViewerClientProps
       setTotalItems(payload.total ?? 0);
       setTotalPages(payload.total_pages ?? 1);
     } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : "Failed to load schedules.";
+      const message =
+        loadError instanceof Error
+          ? loadError.message
+          : "Failed to load schedules.";
       setError(message);
     } finally {
       setLoading(false);
@@ -83,21 +96,38 @@ export default function ScheduleViewerClient({ role }: ScheduleViewerClientProps
   }, [loadSchedules]);
 
   const columns = [
-    { key: "type", label: "Type", render: (item: ScheduleItem) => item.schedule_type },
+    {
+      key: "type",
+      label: "Type",
+      render: (item: ScheduleItem) => item.schedule_type,
+    },
     { key: "day", label: "Day", render: (item: ScheduleItem) => item.day },
     {
       key: "date",
       label: "Date",
-      render: (item: ScheduleItem) => (item.date ? new Date(item.date).toLocaleDateString() : "-"),
+      render: (item: ScheduleItem) =>
+        item.date ? new Date(item.date).toLocaleDateString() : "-",
     },
     {
       key: "time",
       label: "Time",
       render: (item: ScheduleItem) => `${item.start_time} - ${item.end_time}`,
     },
-    { key: "semester", label: "Semester", render: (item: ScheduleItem) => item.semester },
-    { key: "section", label: "Section", render: (item: ScheduleItem) => item.section },
-    { key: "status", label: "Status", render: (item: ScheduleItem) => <StatusBadge label={item.status} /> },
+    {
+      key: "semester",
+      label: "Semester",
+      render: (item: ScheduleItem) => item.semester,
+    },
+    {
+      key: "section",
+      label: "Section",
+      render: (item: ScheduleItem) => item.section,
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (item: ScheduleItem) => <StatusBadge label={item.status} />,
+    },
   ];
 
   return (
@@ -112,7 +142,7 @@ export default function ScheduleViewerClient({ role }: ScheduleViewerClientProps
             setPage(1);
           }}
           placeholder="Filter by semester"
-          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
+          className="rounded-md border text-zinc-700 border-zinc-300 px-3 py-1.5 text-sm"
         />
         <select
           value={day}
@@ -120,7 +150,7 @@ export default function ScheduleViewerClient({ role }: ScheduleViewerClientProps
             setDay(event.target.value);
             setPage(1);
           }}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm"
+          className="rounded-md text-zinc-700 border border-zinc-300 bg-white px-3 py-1.5 text-sm"
         >
           <option value="">All days</option>
           {dayOptions.map((item) => (
@@ -131,7 +161,7 @@ export default function ScheduleViewerClient({ role }: ScheduleViewerClientProps
         </select>
         <button
           onClick={() => void loadSchedules()}
-          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100"
+          className="rounded-md text-zinc-700 border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100"
         >
           Refresh
         </button>
@@ -153,7 +183,9 @@ export default function ScheduleViewerClient({ role }: ScheduleViewerClientProps
         </div>
       </FilterBar>
 
-      {loading ? <InlineAlert tone="info" message="Loading schedules..." /> : null}
+      {loading ? (
+        <InlineAlert tone="info" message="Loading schedules..." />
+      ) : null}
       {error ? <InlineAlert tone="error" message={error} /> : null}
       {!loading && schedules.length === 0 ? (
         <EmptyState
@@ -168,7 +200,11 @@ export default function ScheduleViewerClient({ role }: ScheduleViewerClientProps
 
       {!loading && schedules.length > 0 ? (
         <>
-          <EntityTable columns={columns} rows={schedules} rowKey={(item) => item._id} />
+          <EntityTable
+            columns={columns}
+            rows={schedules}
+            rowKey={(item) => item._id}
+          />
           <div className="flex items-center justify-end gap-2">
             <button
               type="button"

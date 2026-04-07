@@ -133,7 +133,7 @@ export default function NotificationsClient() {
             setTypeFilter(event.target.value);
             setPage(1);
           }}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm"
+          className="rounded-md border border-zinc-300 text-zinc-700 bg-white px-3 py-1.5 text-sm"
         >
           <option value="">All types</option>
           {notificationTypes.map((type) => (
@@ -149,7 +149,7 @@ export default function NotificationsClient() {
             setReadFilter(event.target.value as "all" | "read" | "unread");
             setPage(1);
           }}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm"
+          className="rounded-md border border-zinc-300 text-zinc-700 bg-white px-3 py-1.5 text-sm"
         >
           <option value="all">All</option>
           <option value="unread">Unread</option>

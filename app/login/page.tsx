@@ -42,10 +42,10 @@ export default function LoginPage() {
         className="w-full max-w-md space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm"
       >
         <h1 className="text-2xl font-semibold text-zinc-900">Sign in</h1>
-        <p className="text-sm text-zinc-600">Access CampusPilot AI</p>
+        <p className="text-sm text-zinc-900">Access CampusPilot AI</p>
 
         <label className="block">
-          <span className="mb-1 block text-sm text-zinc-700">Email</span>
+          <span className="mb-1 block text-sm text-zinc-900">Email</span>
           <input
             type="email"
             value={email}
@@ -56,7 +56,7 @@ export default function LoginPage() {
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm text-zinc-700">Password</span>
+          <span className="mb-1 block text-sm text-zinc-900">Password</span>
           <input
             type="password"
             value={password}
@@ -76,7 +76,7 @@ export default function LoginPage() {
           {loading ? "Signing in..." : "Sign in"}
         </button>
 
-        <div className="flex items-center justify-between text-sm text-zinc-600">
+        <div className="flex items-center justify-between text-sm text-zinc-900">
           <p>Need an account? Contact your department administrator.</p>
           <Link href="/" className="underline hover:text-zinc-900">
             Back home

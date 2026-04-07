@@ -18,7 +18,8 @@ const toneClassMap: Record<StatusTone, string> = {
 function toneFromStatus(status: string): StatusTone {
   const value = status.toLowerCase();
   if (["approved", "completed", "published"].includes(value)) return "success";
-  if (["pending", "in_review", "draft", "updated"].includes(value)) return "warning";
+  if (["pending", "in_review", "draft", "updated"].includes(value))
+    return "warning";
   if (["rejected", "cancelled", "critical"].includes(value)) return "danger";
   if (["escalated", "info"].includes(value)) return "info";
   return "default";

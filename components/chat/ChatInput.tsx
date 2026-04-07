@@ -9,7 +9,12 @@ type ChatInputProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
-export default function ChatInput({ value, isLoading, onChange, onSubmit }: ChatInputProps) {
+export default function ChatInput({
+  value,
+  isLoading,
+  onChange,
+  onSubmit,
+}: ChatInputProps) {
   return (
     <form onSubmit={onSubmit} className="mt-4 flex gap-2">
       <input
@@ -18,7 +23,7 @@ export default function ChatInput({ value, isLoading, onChange, onSubmit }: Chat
         onChange={(event) => onChange(event.target.value)}
         placeholder="Ask your question..."
         disabled={isLoading}
-        className="flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500 disabled:opacity-60"
+        className="flex-1 rounded-md border text-zinc-900 border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500 disabled:opacity-60"
       />
       <button
         type="submit"

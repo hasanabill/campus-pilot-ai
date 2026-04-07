@@ -8,7 +8,7 @@ export default async function ReportsDashboardPage() {
   requireAnyRole(user.role, ["faculty", "admin", "registrar"]);
 
   return (
-    <main className="mx-auto max-w-6xl p-2 md:p-4">
+    <main className="mx-auto max-w-6xl text-zinc-600 p-2 md:p-4">
       <ReportsClient />
     </main>
   );

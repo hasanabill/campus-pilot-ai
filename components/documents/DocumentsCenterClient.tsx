@@ -30,17 +30,24 @@ type UploadResult = {
 };
 
 export default function DocumentsCenterClient() {
-  const [documentType, setDocumentType] = useState<(typeof documentTypes)[number]>("certificate");
+  const [documentType, setDocumentType] =
+    useState<(typeof documentTypes)[number]>("certificate");
   const [title, setTitle] = useState("");
   const [templateName, setTemplateName] = useState("");
   const [tone, setTone] = useState<(typeof tones)[number]>("formal");
   const [maxWords, setMaxWords] = useState(500);
-  const [inputRows, setInputRows] = useState<InputRow[]>([{ key: "", value: "" }]);
+  const [inputRows, setInputRows] = useState<InputRow[]>([
+    { key: "", value: "" },
+  ]);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [generateSuccess, setGenerateSuccess] = useState<string | null>(null);
-  const [generatedCloudinaryUrl, setGeneratedCloudinaryUrl] = useState<string | null>(null);
-  const [generatedPublicId, setGeneratedPublicId] = useState<string | null>(null);
+  const [generatedCloudinaryUrl, setGeneratedCloudinaryUrl] = useState<
+    string | null
+  >(null);
+  const [generatedPublicId, setGeneratedPublicId] = useState<string | null>(
+    null
+  );
 
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadFolder, setUploadFolder] = useState("campus-pilot/documents");
@@ -49,7 +56,9 @@ export default function DocumentsCenterClient() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
 
   function setInputRow(index: number, patch: Partial<InputRow>) {
-    setInputRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+    setInputRows((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, ...patch } : row))
+    );
   }
 
   function addInputRow() {
@@ -103,7 +112,9 @@ export default function DocumentsCenterClient() {
       });
 
       if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
         throw new Error(payload?.error ?? "Failed to generate document.");
       }
 
@@ -164,7 +175,8 @@ export default function DocumentsCenterClient() {
       setUploadResult(payload);
       setUploadFile(null);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Document upload failed.";
+      const message =
+        error instanceof Error ? error.message : "Document upload failed.";
       setUploadError(message);
     } finally {
       setUploadLoading(false);
@@ -172,24 +184,37 @@ export default function DocumentsCenterClient() {
   }
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-6 text-zinc-700">
       <PageHeader
         title="Document Center"
         subtitle="Generate official documents using AI prompts and upload finalized files to Cloudinary."
       />
 
-      <form onSubmit={onGenerate} className="space-y-4 rounded-xl border border-zinc-200 bg-white p-5">
-        <h2 className="text-lg font-semibold text-zinc-900">Generate Document</h2>
-        {generateError ? <InlineAlert tone="error" message={generateError} /> : null}
-        {generateSuccess ? <InlineAlert tone="success" message={generateSuccess} /> : null}
+      <form
+        onSubmit={onGenerate}
+        className="space-y-4 rounded-xl border border-zinc-200 bg-white p-5"
+      >
+        <h2 className="text-lg font-semibold text-zinc-900">
+          Generate Document
+        </h2>
+        {generateError ? (
+          <InlineAlert tone="error" message={generateError} />
+        ) : null}
+        {generateSuccess ? (
+          <InlineAlert tone="success" message={generateSuccess} />
+        ) : null}
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-sm text-zinc-700">Document Type</span>
+            <span className="mb-1 block text-sm text-zinc-700">
+              Document Type
+            </span>
             <select
               value={documentType}
               onChange={(event) =>
-                setDocumentType(event.target.value as (typeof documentTypes)[number])
+                setDocumentType(
+                  event.target.value as (typeof documentTypes)[number]
+                )
               }
               className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
             >
@@ -212,7 +237,9 @@ export default function DocumentsCenterClient() {
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-sm text-zinc-700">Template Name (optional)</span>
+            <span className="mb-1 block text-sm text-zinc-700">
+              Template Name (optional)
+            </span>
             <input
               value={templateName}
               onChange={(event) => setTemplateName(event.target.value)}
@@ -224,7 +251,9 @@ export default function DocumentsCenterClient() {
             <span className="mb-1 block text-sm text-zinc-700">Tone</span>
             <select
               value={tone}
-              onChange={(event) => setTone(event.target.value as (typeof tones)[number])}
+              onChange={(event) =>
+                setTone(event.target.value as (typeof tones)[number])
+              }
               className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
             >
               {tones.map((item) => (
@@ -249,19 +278,25 @@ export default function DocumentsCenterClient() {
         </label>
 
         <div className="space-y-2">
-          <p className="text-sm font-medium text-zinc-900">Dynamic Inputs (Key/Value)</p>
+          <p className="text-sm font-medium text-zinc-900">
+            Dynamic Inputs (Key/Value)
+          </p>
           {inputRows.map((row, index) => (
             <div key={index} className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
               <input
                 placeholder="Key (e.g. student_name)"
                 value={row.key}
-                onChange={(event) => setInputRow(index, { key: event.target.value })}
+                onChange={(event) =>
+                  setInputRow(index, { key: event.target.value })
+                }
                 className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
               />
               <input
                 placeholder="Value"
                 value={row.value}
-                onChange={(event) => setInputRow(index, { value: event.target.value })}
+                onChange={(event) =>
+                  setInputRow(index, { value: event.target.value })
+                }
                 className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
               />
               <button
@@ -297,7 +332,12 @@ export default function DocumentsCenterClient() {
             <p>
               Cloudinary URL:{" "}
               {generatedCloudinaryUrl ? (
-                <a className="underline" href={generatedCloudinaryUrl} target="_blank" rel="noreferrer">
+                <a
+                  className="underline"
+                  href={generatedCloudinaryUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Open generated file
                 </a>
               ) : (
@@ -308,13 +348,24 @@ export default function DocumentsCenterClient() {
         ) : null}
       </form>
 
-      <form onSubmit={onUpload} className="space-y-4 rounded-xl border border-zinc-200 bg-white p-5">
-        <h2 className="text-lg font-semibold text-zinc-900">Upload Existing Document</h2>
-        {uploadError ? <InlineAlert tone="error" message={uploadError} /> : null}
-        {uploadResult?.message ? <InlineAlert tone="success" message={uploadResult.message} /> : null}
+      <form
+        onSubmit={onUpload}
+        className="space-y-4 rounded-xl border border-zinc-200 bg-white p-5"
+      >
+        <h2 className="text-lg font-semibold text-zinc-900">
+          Upload Existing Document
+        </h2>
+        {uploadError ? (
+          <InlineAlert tone="error" message={uploadError} />
+        ) : null}
+        {uploadResult?.message ? (
+          <InlineAlert tone="success" message={uploadResult.message} />
+        ) : null}
 
         <label className="block">
-          <span className="mb-1 block text-sm text-zinc-700">Cloudinary Folder</span>
+          <span className="mb-1 block text-sm text-zinc-700">
+            Cloudinary Folder
+          </span>
           <input
             value={uploadFolder}
             onChange={(event) => setUploadFolder(event.target.value)}
@@ -348,7 +399,12 @@ export default function DocumentsCenterClient() {
             <p>
               Cloudinary URL:{" "}
               {uploadResult.cloudinary_url ? (
-                <a className="underline" href={uploadResult.cloudinary_url} target="_blank" rel="noreferrer">
+                <a
+                  className="underline"
+                  href={uploadResult.cloudinary_url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Open uploaded file
                 </a>
               ) : (

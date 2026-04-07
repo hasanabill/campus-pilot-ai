@@ -4,14 +4,22 @@ import { FormEvent, useState } from "react";
 
 import InlineAlert from "@/components/ui/InlineAlert";
 
-const ticketTypes = ["certificate", "transcript", "correction", "permission", "internship", "other"] as const;
+const ticketTypes = [
+  "certificate",
+  "transcript",
+  "correction",
+  "permission",
+  "internship",
+  "other",
+] as const;
 const priorities = ["low", "medium", "high", "urgent"] as const;
 
 export default function TicketSubmissionForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<(typeof ticketTypes)[number]>("certificate");
-  const [priority, setPriority] = useState<(typeof priorities)[number]>("medium");
+  const [priority, setPriority] =
+    useState<(typeof priorities)[number]>("medium");
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +84,10 @@ export default function TicketSubmissionForm() {
       setFieldErrors({});
       setMessage("Ticket submitted successfully.");
     } catch (submitError) {
-      const msg = submitError instanceof Error ? submitError.message : "Ticket submission failed.";
+      const msg =
+        submitError instanceof Error
+          ? submitError.message
+          : "Ticket submission failed.";
       setError(msg);
     } finally {
       setIsLoading(false);
@@ -86,11 +97,12 @@ export default function TicketSubmissionForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="w-full max-w-3xl space-y-4 rounded-xl border border-zinc-200 bg-white p-5"
+      className="w-full text-zinc-600 max-w-3xl space-y-4 rounded-xl border border-zinc-200 bg-white p-5"
     >
       <h2 className="text-xl font-semibold text-zinc-900">Submit Ticket</h2>
       <p className="text-sm text-zinc-600">
-        Create a new service request for academic document, correction, permission, or related support.
+        Create a new service request for academic document, correction,
+        permission, or related support.
       </p>
 
       {message ? <InlineAlert tone="success" message={message} /> : null}
@@ -117,7 +129,9 @@ export default function TicketSubmissionForm() {
           <p className="text-xs text-zinc-500">Keep it short and specific.</p>
           <p className="text-xs text-zinc-500">{title.length}/200</p>
         </div>
-        {fieldErrors.title ? <p className="mt-1 text-xs text-red-600">{fieldErrors.title}</p> : null}
+        {fieldErrors.title ? (
+          <p className="mt-1 text-xs text-red-600">{fieldErrors.title}</p>
+        ) : null}
       </label>
 
       <label className="block">
@@ -139,7 +153,8 @@ export default function TicketSubmissionForm() {
         />
         <div className="mt-1 flex items-center justify-between">
           <p className="text-xs text-zinc-500">
-            Include relevant context (IDs, course code, requested outcome, and deadline).
+            Include relevant context (IDs, course code, requested outcome, and
+            deadline).
           </p>
           <p className="text-xs text-zinc-500">{description.length}/5000</p>
         </div>
@@ -153,7 +168,9 @@ export default function TicketSubmissionForm() {
           <span className="mb-1 block text-sm text-zinc-700">Type</span>
           <select
             value={type}
-            onChange={(event) => setType(event.target.value as (typeof ticketTypes)[number])}
+            onChange={(event) =>
+              setType(event.target.value as (typeof ticketTypes)[number])
+            }
             className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500"
           >
             {ticketTypes.map((item) => (
@@ -168,7 +185,9 @@ export default function TicketSubmissionForm() {
           <span className="mb-1 block text-sm text-zinc-700">Priority</span>
           <select
             value={priority}
-            onChange={(event) => setPriority(event.target.value as (typeof priorities)[number])}
+            onChange={(event) =>
+              setPriority(event.target.value as (typeof priorities)[number])
+            }
             className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500"
           >
             {priorities.map((item) => (
@@ -182,7 +201,9 @@ export default function TicketSubmissionForm() {
 
       <button
         type="submit"
-        disabled={isLoading || title.trim().length < 3 || description.trim().length < 10}
+        disabled={
+          isLoading || title.trim().length < 3 || description.trim().length < 10
+        }
         className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isLoading ? "Submitting..." : "Submit"}

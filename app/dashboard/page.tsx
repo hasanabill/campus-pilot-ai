@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import EmptyState from "@/components/ui/EmptyState";
@@ -6,6 +5,7 @@ import MetricCard from "@/components/ui/MetricCard";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { auth } from "@/lib/auth";
+import { requireAuthenticatedUser } from "@/lib/routeGuards";
 import {
   getDashboardOverview,
   getStudentDashboardOverview,
@@ -13,13 +13,14 @@ import {
 
 export default async function DashboardPage() {
   const session = await auth();
-
-  if (!session?.user) {
-    redirect("/login");
+  const user = requireAuthenticatedUser(session);
+  const sessionUser = session?.user;
+  if (!sessionUser) {
+    return null;
   }
 
-  if (session.user.role === "student") {
-    const studentOverview = await getStudentDashboardOverview(session.user.id);
+  if (user.role === "student") {
+    const studentOverview = await getStudentDashboardOverview(user.id);
 
     return (
       <main className="mx-auto max-w-6xl p-2 md:p-4">
@@ -85,7 +86,7 @@ export default async function DashboardPage() {
               />
             </div>
           ) : (
-            <div className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+            <div className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-900">
               <p>
                 <span className="font-medium text-zinc-900">Day:</span>{" "}
                 {studentOverview.upcoming_schedule.day}
@@ -133,7 +134,7 @@ export default async function DashboardPage() {
                   <p className="text-sm font-medium text-zinc-900">
                     {item.message}
                   </p>
-                  <div className="mt-1 flex items-center gap-2 text-xs uppercase tracking-wide text-zinc-500">
+                  <div className="mt-1 flex items-center gap-2 text-xs uppercase tracking-wide text-zinc-900">
                     <StatusBadge
                       label={item.type}
                       tone={item.is_read ? "muted" : "info"}
@@ -150,8 +151,8 @@ export default async function DashboardPage() {
   }
 
   const overview = await getDashboardOverview({
-    requester_role: session.user.role,
-    requester_user_id: session.user.id,
+    requester_role: user.role,
+    requester_user_id: user.id,
   });
 
   return (
@@ -196,7 +197,7 @@ export default async function DashboardPage() {
                 <p className="text-sm font-medium text-zinc-900">
                   {item.description}
                 </p>
-                <div className="mt-1 flex items-center gap-2 text-xs uppercase tracking-wide text-zinc-500">
+                <div className="mt-1 flex items-center gap-2 text-xs uppercase tracking-wide text-zinc-900">
                   <StatusBadge label={item.type} tone="muted" />
                   <span>{new Date(item.timestamp).toLocaleString()}</span>
                 </div>
@@ -206,19 +207,19 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      <div className="mt-6 rounded-lg border text-zinc-900 border-zinc-200 bg-white p-4">
+      <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4 text-zinc-900">
         <p>
-          <span className="font-semibold">Name:</span> {session.user.name}
+          <span className="font-semibold">Name:</span> {sessionUser.name}
         </p>
         <p>
-          <span className="font-semibold">Email:</span> {session.user.email}
+          <span className="font-semibold">Email:</span> {sessionUser.email}
         </p>
         <p>
-          <span className="font-semibold">Role:</span> {session.user.role}
+          <span className="font-semibold">Role:</span> {sessionUser.role}
         </p>
         <p>
           <span className="font-semibold">Department:</span>{" "}
-          {session.user.department_id ?? "N/A"}
+          {sessionUser.department_id ?? "N/A"}
         </p>
       </div>
     </main>

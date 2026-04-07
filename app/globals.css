@@ -24,3 +24,11 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@layer utilities {
+  .text-zinc-500,
+  .text-zinc-600,
+  .text-zinc-700 {
+    color: rgb(24 24 27) !important;
+  }
+}
