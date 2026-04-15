@@ -2,13 +2,11 @@
 
 import Link from "next/link";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 import InlineAlert from "@/components/ui/InlineAlert";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +30,9 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    // Force a full navigation so auth-aware server layout/sidebar
+    // gets the fresh session immediately after login.
+    window.location.href = "/dashboard";
   }
 
   return (

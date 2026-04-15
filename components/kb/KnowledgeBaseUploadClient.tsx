@@ -33,8 +33,10 @@ export default function KnowledgeBaseUploadClient({
   defaultDepartmentId,
 }: KnowledgeBaseUploadClientProps) {
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState<(typeof categories)[number]>("notice");
-  const [sourceType, setSourceType] = useState<(typeof sourceTypes)[number]>("pdf");
+  const [category, setCategory] =
+    useState<(typeof categories)[number]>("notice");
+  const [sourceType, setSourceType] =
+    useState<(typeof sourceTypes)[number]>("pdf");
   const [departmentId, setDepartmentId] = useState(defaultDepartmentId ?? "");
   const [documentText, setDocumentText] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -93,7 +95,9 @@ export default function KnowledgeBaseUploadClient({
       resetForm();
     } catch (submitError) {
       const message =
-        submitError instanceof Error ? submitError.message : "Knowledge base upload failed.";
+        submitError instanceof Error
+          ? submitError.message
+          : "Knowledge base upload failed.";
       setError(message);
     } finally {
       setLoading(false);
@@ -108,13 +112,15 @@ export default function KnowledgeBaseUploadClient({
       />
 
       {error ? <InlineAlert tone="error" message={error} /> : null}
-      {result?.message ? <InlineAlert tone="success" message={result.message} /> : null}
+      {result?.message ? (
+        <InlineAlert tone="success" message={result.message} />
+      ) : null}
 
       <form
         onSubmit={onSubmit}
         className="space-y-4 rounded-xl border border-zinc-200 bg-white p-5"
       >
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 text-zinc-700 md:grid-cols-2">
           <label className="block">
             <span className="mb-1 block text-sm text-zinc-700">Title</span>
             <input
@@ -125,7 +131,9 @@ export default function KnowledgeBaseUploadClient({
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-sm text-zinc-700">Department ID</span>
+            <span className="mb-1 block text-sm text-zinc-700">
+              Department ID
+            </span>
             <input
               required
               value={departmentId}
@@ -138,7 +146,9 @@ export default function KnowledgeBaseUploadClient({
             <span className="mb-1 block text-sm text-zinc-700">Category</span>
             <select
               value={category}
-              onChange={(event) => setCategory(event.target.value as (typeof categories)[number])}
+              onChange={(event) =>
+                setCategory(event.target.value as (typeof categories)[number])
+              }
               className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
             >
               {categories.map((item) => (
@@ -150,11 +160,15 @@ export default function KnowledgeBaseUploadClient({
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-sm text-zinc-700">Source Type</span>
+            <span className="mb-1 block text-sm text-zinc-700">
+              Source Type
+            </span>
             <select
               value={sourceType}
               onChange={(event) =>
-                setSourceType(event.target.value as (typeof sourceTypes)[number])
+                setSourceType(
+                  event.target.value as (typeof sourceTypes)[number]
+                )
               }
               className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
             >
@@ -168,15 +182,19 @@ export default function KnowledgeBaseUploadClient({
         </div>
 
         <label className="block">
-          <span className="mb-1 block text-sm text-zinc-700">Knowledge File</span>
+          <span className="mb-1 block text-sm text-zinc-700">
+            Knowledge File
+          </span>
           <input
             type="file"
             required
             accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+            className="w-full rounded-md border text-zinc-700 border-zinc-300 bg-white px-3 py-2 text-sm"
           />
-          <p className="mt-1 text-xs text-zinc-500">Supported: PDF, DOCX, TXT (max 10MB).</p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Supported: PDF, DOCX, TXT (max 10MB).
+          </p>
         </label>
 
         <label className="block">
@@ -188,9 +206,11 @@ export default function KnowledgeBaseUploadClient({
             value={documentText}
             onChange={(event) => setDocumentText(event.target.value)}
             minLength={20}
-            className="min-h-40 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            className="min-h-40 w-full text-zinc-700 rounded-md border border-zinc-300 px-3 py-2 text-sm"
           />
-          <div className="mt-1 text-right text-xs text-zinc-500">{documentText.length} chars</div>
+          <div className="mt-1 text-right text-xs text-zinc-500">
+            {documentText.length} chars
+          </div>
         </label>
 
         <button
@@ -204,7 +224,9 @@ export default function KnowledgeBaseUploadClient({
 
       {result ? (
         <div className="rounded-xl border border-zinc-200 bg-white p-4">
-          <h3 className="text-sm font-semibold text-zinc-900">Ingestion Result</h3>
+          <h3 className="text-sm font-semibold text-zinc-900">
+            Ingestion Result
+          </h3>
           <ul className="mt-2 space-y-1 text-sm text-zinc-700">
             <li>Document ID: {result.document_id ?? "-"}</li>
             <li>Chunk Count: {result.chunk_count ?? 0}</li>
