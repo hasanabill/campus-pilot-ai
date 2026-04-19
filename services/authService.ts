@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 import { connectToDatabase } from "@/lib/mongodb";
+import Student from "@/models/Student";
 import User, { USER_ROLES, type UserRole } from "@/models/User";
 
 export const registerSchema = z.object({
@@ -11,6 +12,10 @@ export const registerSchema = z.object({
   role: z.enum(USER_ROLES).optional().default("student"),
   department_id: z.string().max(100).optional().nullable(),
   phone: z.string().max(30).optional().nullable(),
+  student_id: z.string().max(50).optional(),
+  program: z.string().max(150).optional(),
+  semester: z.number().int().min(1).max(20).optional(),
+  batch: z.string().max(30).optional(),
 });
 
 export const credentialsSchema = z.object({
@@ -48,6 +53,17 @@ function toSafeUser(user: {
   };
 }
 
+function buildStudentProfileDefaults(parsed: z.infer<typeof registerSchema>, userId: string) {
+  return {
+    student_id:
+      parsed.student_id ??
+      `STU-${new Date().getFullYear()}-${userId.slice(-6).toUpperCase()}`,
+    program: parsed.program ?? "Undeclared Program",
+    semester: parsed.semester ?? 1,
+    batch: parsed.batch ?? `${new Date().getFullYear()}`,
+  };
+}
+
 export async function registerUser(payload: z.infer<typeof registerSchema>): Promise<SafeUser> {
   const parsed = registerSchema.parse(payload);
   await connectToDatabase();
@@ -67,6 +83,24 @@ export async function registerUser(payload: z.infer<typeof registerSchema>): Pro
     department_id: parsed.department_id ?? null,
     phone: parsed.phone ?? null,
   });
+
+  if (parsed.role === "student") {
+    const profile = buildStudentProfileDefaults(parsed, String(created._id));
+    try {
+      await Student.create({
+        user_id: created._id,
+        student_id: profile.student_id,
+        program: profile.program,
+        semester: profile.semester,
+        batch: profile.batch,
+      });
+    } catch {
+      await User.findByIdAndDelete(created._id);
+      throw new Error(
+        "Student profile creation failed. Please provide unique student details and try again.",
+      );
+    }
+  }
 
   return toSafeUser({
     _id: String(created._id),

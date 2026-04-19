@@ -6,24 +6,39 @@ import { FormEvent, useState } from "react";
 
 import InlineAlert from "@/components/ui/InlineAlert";
 
+type DemoRole = "student" | "faculty" | "admin" | "registrar";
+
+// Demo credentials (edit these values as needed).
+const DEMO_CREDENTIALS: Record<DemoRole, { email: string; password: string }> =
+  {
+    student: { email: "student@campus.com", password: "student123" },
+    faculty: { email: "faculty@campus.com", password: "faculty123" },
+    admin: { email: "admin@campus.com", password: "admin123" },
+    registrar: { email: "registrar@campus.com", password: "registrar123" },
+  };
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [activeDemoRole, setActiveDemoRole] = useState<DemoRole | null>(null);
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function loginWithCredentials(
+    targetEmail: string,
+    targetPassword: string
+  ) {
     setError(null);
     setLoading(true);
 
     const result = await signIn("credentials", {
-      email,
-      password,
+      email: targetEmail,
+      password: targetPassword,
       redirect: false,
     });
 
     setLoading(false);
+    setActiveDemoRole(null);
 
     if (!result || result.error) {
       setError("Invalid email or password.");
@@ -32,7 +47,25 @@ export default function LoginPage() {
 
     // Force a full navigation so auth-aware server layout/sidebar
     // gets the fresh session immediately after login.
-    window.location.href = "/dashboard";
+    window.location.assign("/dashboard");
+  }
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await loginWithCredentials(email, password);
+  }
+
+  async function onDemoSignIn(role: DemoRole) {
+    const credentials = DEMO_CREDENTIALS[role];
+    if (!credentials.email || !credentials.password) {
+      setError(`Set ${role} demo credentials in DEMO_CREDENTIALS first.`);
+      return;
+    }
+
+    setActiveDemoRole(role);
+    setEmail(credentials.email);
+    setPassword(credentials.password);
+    await loginWithCredentials(credentials.email, credentials.password);
   }
 
   return (
@@ -75,6 +108,27 @@ export default function LoginPage() {
         >
           {loading ? "Signing in..." : "Sign in"}
         </button>
+
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-zinc-900">Demo Sign In</p>
+          <div className="grid grid-cols-2 gap-2">
+            {(["student", "faculty", "admin", "registrar"] as const).map(
+              (role) => (
+                <button
+                  key={role}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => void onDemoSignIn(role)}
+                  className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100 disabled:opacity-60"
+                >
+                  {activeDemoRole === role && loading
+                    ? `Signing ${role}...`
+                    : `${role[0].toUpperCase()}${role.slice(1)}`}
+                </button>
+              )
+            )}
+          </div>
+        </div>
 
         <div className="flex items-center justify-between text-sm text-zinc-900">
           <p>Need an account? Contact your department administrator.</p>
