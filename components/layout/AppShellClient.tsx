@@ -30,6 +30,7 @@ const navItems: NavItem[] = [
   { href: "/schedules", label: "Schedules", roles: ["student", "faculty", "admin", "registrar"] },
   { href: "/dashboard/schedules", label: "Schedule Admin", roles: ["admin"] },
   { href: "/dashboard/kb", label: "KB Upload", roles: ["admin"] },
+  { href: "/dashboard/activity", label: "Activity Log", roles: ["admin"] },
   { href: "/dashboard/documents", label: "Document Center", roles: ["faculty", "admin", "registrar"] },
   { href: "/dashboard/approvals", label: "Approvals", roles: ["admin", "registrar"] },
   { href: "/dashboard/reports", label: "Reports", roles: ["faculty", "admin", "registrar"] },
