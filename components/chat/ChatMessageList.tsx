@@ -10,7 +10,7 @@ type ChatMessageListProps = {
 
 export default function ChatMessageList({ messages, isLoading }: ChatMessageListProps) {
   return (
-    <div className="h-[55vh] overflow-y-auto rounded-lg border border-zinc-200 bg-white p-4">
+    <div className="h-full min-h-0 flex-1 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-4">
       {messages.length === 0 ? (
         <div className="rounded-md border border-dashed border-zinc-300 bg-zinc-50 p-3 text-sm text-zinc-600">
           <p className="font-medium text-zinc-900">Ask about:</p>

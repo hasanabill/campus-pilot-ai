@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f5f7fb;
+  --foreground: #18181b;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --border: #e4e4e7;
 }
 
 @theme inline {
@@ -20,9 +23,41 @@
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(1200px 500px at 20% -10%, rgba(99, 102, 241, 0.08), transparent 60%),
+    radial-gradient(1000px 480px at 90% -20%, rgba(56, 189, 248, 0.08), transparent 60%),
+    var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+* {
+  border-color: var(--border);
+}
+
+::selection {
+  background: rgba(24, 24, 27, 0.15);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(63, 63, 70, 0.35);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(39, 39, 42, 0.5);
 }
 
 @layer utilities {
@@ -30,5 +65,11 @@ body {
   .text-zinc-600,
   .text-zinc-700 {
     color: rgb(24 24 27) !important;
+  }
+
+  .app-surface {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
   }
 }

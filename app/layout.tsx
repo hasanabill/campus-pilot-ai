@@ -26,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased text-zinc-700`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased text-zinc-900`}
       >
         <AppShell>{children}</AppShell>
       </body>

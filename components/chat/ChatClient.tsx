@@ -104,7 +104,7 @@ export default function ChatClient({ userName }: ChatClientProps) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl p-4 md:p-6">
+    <div className="mx-auto flex h-[calc(100vh-9rem)] w-full max-w-4xl flex-col p-4 md:p-6">
       <header className="mb-4">
         <h1 className="text-2xl font-bold text-zinc-900">AI Chat Assistant</h1>
         <p className="mt-1 text-sm text-zinc-600">
@@ -132,8 +132,9 @@ export default function ChatClient({ userName }: ChatClientProps) {
         </div>
       </div>
 
-      <ChatMessageList messages={messages} isLoading={isLoading} />
-      <ChatInput value={question} isLoading={isLoading} onChange={setQuestion} onSubmit={onSubmit} />
+      <div className="min-h-0 flex-1">
+        <ChatMessageList messages={messages} isLoading={isLoading} />
+      </div>
 
       {error ? <InlineAlert message={error} tone="error" /> : null}
       {lastFailedQuestion ? (
@@ -151,6 +152,15 @@ export default function ChatClient({ userName }: ChatClientProps) {
           </button>
         </div>
       ) : null}
+
+      <div className="sticky bottom-0 mt-3 border-t border-zinc-200 bg-zinc-50/95 pt-3 backdrop-blur supports-backdrop-filter:bg-zinc-50/85">
+        <ChatInput
+          value={question}
+          isLoading={isLoading}
+          onChange={setQuestion}
+          onSubmit={onSubmit}
+        />
+      </div>
     </div>
   );
 }

@@ -16,7 +16,7 @@ export default function ChatInput({
   onSubmit,
 }: ChatInputProps) {
   return (
-    <form onSubmit={onSubmit} className="mt-4 flex gap-2">
+    <form onSubmit={onSubmit} className="flex gap-2">
       <input
         type="text"
         value={value}
