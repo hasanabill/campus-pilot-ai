@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import EmptyState from "@/components/ui/EmptyState";
+import EmptyState  from "@/components/ui/EmptyState";
 import EntityTable from "@/components/ui/EntityTable";
-import FilterBar from "@/components/ui/FilterBar";
+import FilterBar   from "@/components/ui/FilterBar";
 import InlineAlert from "@/components/ui/InlineAlert";
-import PageHeader from "@/components/ui/PageHeader";
+import MetricCard  from "@/components/ui/MetricCard";
+import PageHeader  from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 
 type TicketItem = {
@@ -22,498 +23,231 @@ type TicketItem = {
   created_at?: string;
 };
 
-type TicketListClientProps = {
-  adminMode?: boolean;
-};
+const statuses     = ["pending", "in_review", "approved", "rejected", "completed", "escalated"] as const;
+const ticketTypes  = ["certificate", "transcript", "correction", "permission", "internship", "other"] as const;
 
-const statuses = [
-  "pending",
-  "in_review",
-  "approved",
-  "rejected",
-  "completed",
-  "escalated",
-] as const;
-const ticketTypes = [
-  "certificate",
-  "transcript",
-  "correction",
-  "permission",
-  "internship",
-  "other",
-] as const;
+function isOverdue(ticket: TicketItem): boolean {
+  if (!ticket.due_date) return false;
+  const due = new Date(ticket.due_date).getTime();
+  return !Number.isNaN(due) && due < Date.now() && ["pending", "in_review", "approved"].includes(ticket.status);
+}
 
-export default function TicketListClient({
-  adminMode = false,
-}: TicketListClientProps) {
-  const [tickets, setTickets] = useState<TicketItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+export default function TicketListClient({ adminMode = false }: { adminMode?: boolean }) {
+  const [tickets,         setTickets]         = useState<TicketItem[]>([]);
+  const [loading,         setLoading]         = useState(true);
+  const [error,           setError]           = useState<string | null>(null);
+  const [message,         setMessage]         = useState<string | null>(null);
   const [showOverdueOnly, setShowOverdueOnly] = useState(false);
-  const [assigneeDrafts, setAssigneeDrafts] = useState<Record<string, string>>(
-    {}
-  );
-  const [statusFilter, setStatusFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
+  const [assigneeDrafts,  setAssigneeDrafts]  = useState<Record<string, string>>({});
+  const [statusFilter,    setStatusFilter]    = useState("");
+  const [typeFilter,      setTypeFilter]      = useState("");
+  const [page,            setPage]            = useState(1);
+  const [totalPages,      setTotalPages]      = useState(1);
+  const [totalItems,      setTotalItems]      = useState(0);
 
   const loadTickets = useCallback(async () => {
     setLoading(true);
     setError(null);
-
     try {
-      const query = new URLSearchParams();
-      query.set("limit", "10");
-      query.set("page", String(page));
-      if (statusFilter) query.set("status", statusFilter);
-      if (typeFilter) query.set("type", typeFilter);
+      const q = new URLSearchParams({ limit: "10", page: String(page) });
+      if (statusFilter) q.set("status", statusFilter);
+      if (typeFilter)   q.set("type",   typeFilter);
 
-      const response = await fetch(`/api/tickets?${query.toString()}`);
-      const payload = (await response.json()) as {
-        tickets?: TicketItem[];
-        total_pages?: number;
-        total?: number;
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to load tickets.");
-      }
+      const res     = await fetch(`/api/tickets?${q}`);
+      const payload = (await res.json()) as { tickets?: TicketItem[]; total_pages?: number; total?: number; error?: string };
+      if (!res.ok) throw new Error(payload.error ?? "Failed to load tickets.");
+
       setTickets(payload.tickets ?? []);
-      setAssigneeDrafts(
-        (payload.tickets ?? []).reduce<Record<string, string>>((acc, item) => {
-          acc[item._id] = item.assigned_to ?? "";
-          return acc;
-        }, {})
-      );
+      setAssigneeDrafts((payload.tickets ?? []).reduce<Record<string, string>>((acc, t) => {
+        acc[t._id] = t.assigned_to ?? "";
+        return acc;
+      }, {}));
       setTotalPages(payload.total_pages ?? 1);
       setTotalItems(payload.total ?? 0);
-    } catch (loadError) {
-      const msg =
-        loadError instanceof Error
-          ? loadError.message
-          : "Failed to load tickets.";
-      setError(msg);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load tickets.");
     } finally {
       setLoading(false);
     }
   }, [page, statusFilter, typeFilter]);
 
-  useEffect(() => {
-    void loadTickets();
-  }, [loadTickets]);
+  useEffect(() => { void loadTickets(); }, [loadTickets]);
 
-  async function updateStatus(
-    ticketId: string,
-    status: (typeof statuses)[number]
-  ) {
-    setError(null);
-    setMessage(null);
+  async function updateStatus(id: string, status: (typeof statuses)[number]) {
+    setError(null); setMessage(null);
     try {
-      const response = await fetch(`/api/tickets/${ticketId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Status update failed.");
-      }
+      const res = await fetch(`/api/tickets/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+      if (!res.ok) { const p = (await res.json()) as { error?: string }; throw new Error(p.error ?? "Update failed."); }
       setMessage("Ticket status updated.");
       await loadTickets();
-    } catch (updateError) {
-      const msg =
-        updateError instanceof Error
-          ? updateError.message
-          : "Status update failed.";
-      setError(msg);
-    }
+    } catch (err) { setError(err instanceof Error ? err.message : "Update failed."); }
   }
 
-  async function assignTicket(ticketId: string, assignedTo: string) {
-    setError(null);
-    setMessage(null);
+  async function assignTicket(id: string, assignedTo: string) {
+    setError(null); setMessage(null);
     try {
-      const response = await fetch(`/api/tickets/${ticketId}/assign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assigned_to: assignedTo }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Assignment failed.");
-      }
-      setMessage("Ticket assigned successfully.");
+      const res = await fetch(`/api/tickets/${id}/assign`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assigned_to: assignedTo }) });
+      if (!res.ok) { const p = (await res.json()) as { error?: string }; throw new Error(p.error ?? "Assignment failed."); }
+      setMessage("Ticket assigned.");
       await loadTickets();
-    } catch (assignError) {
-      const msg =
-        assignError instanceof Error
-          ? assignError.message
-          : "Assignment failed.";
-      setError(msg);
-    }
+    } catch (err) { setError(err instanceof Error ? err.message : "Assignment failed."); }
   }
 
-  async function escalateTicket(ticketId: string) {
-    setError(null);
-    setMessage(null);
+  async function escalateTicket(id: string) {
+    setError(null); setMessage(null);
+    if (!window.confirm("Escalate this ticket now?")) return;
     try {
-      const confirmed = window.confirm("Escalate this ticket now?");
-      if (!confirmed) return;
-
-      const response = await fetch(`/api/tickets/${ticketId}/escalate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "manual_admin_escalation" }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Escalation failed.");
-      }
+      const res = await fetch(`/api/tickets/${id}/escalate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: "manual_admin_escalation" }) });
+      if (!res.ok) { const p = (await res.json()) as { error?: string }; throw new Error(p.error ?? "Escalation failed."); }
       setMessage("Ticket escalated.");
       await loadTickets();
-    } catch (escalateError) {
-      const msg =
-        escalateError instanceof Error
-          ? escalateError.message
-          : "Escalation failed.";
-      setError(msg);
-    }
+    } catch (err) { setError(err instanceof Error ? err.message : "Escalation failed."); }
   }
 
   async function runEscalationSweep() {
-    setError(null);
-    setMessage(null);
+    setError(null); setMessage(null);
+    if (!window.confirm("Run escalation sweep for all overdue pending/in-review/approved tickets?")) return;
     try {
-      const confirmed = window.confirm(
-        "Run escalation sweep for all overdue pending/in-review/approved tickets?"
-      );
-      if (!confirmed) return;
-
-      const response = await fetch("/api/tickets/escalate", { method: "POST" });
-      const payload = (await response.json()) as {
-        error?: string;
-        escalated_count?: number;
-      };
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Escalation sweep failed.");
-      }
-      setMessage(
-        `Escalation sweep complete. Escalated: ${payload.escalated_count ?? 0}.`
-      );
+      const res     = await fetch("/api/tickets/escalate", { method: "POST" });
+      const payload = (await res.json()) as { error?: string; escalated_count?: number };
+      if (!res.ok) throw new Error(payload.error ?? "Sweep failed.");
+      setMessage(`Escalation sweep complete. Escalated: ${payload.escalated_count ?? 0}.`);
       await loadTickets();
-    } catch (sweepError) {
-      const msg =
-        sweepError instanceof Error
-          ? sweepError.message
-          : "Escalation sweep failed.";
-      setError(msg);
-    }
+    } catch (err) { setError(err instanceof Error ? err.message : "Sweep failed."); }
   }
 
-  function isOverdue(ticket: TicketItem): boolean {
-    if (!ticket.due_date) return false;
-    const due = new Date(ticket.due_date).getTime();
-    if (Number.isNaN(due)) return false;
-    return (
-      due < Date.now() &&
-      ["pending", "in_review", "approved"].includes(ticket.status)
-    );
-  }
-
-  const overdueCount = tickets.filter(isOverdue).length;
-  const escalatedCount = tickets.filter(
-    (item) => item.status === "escalated"
-  ).length;
-  const highPriorityCount = tickets.filter((item) =>
-    ["high", "urgent"].includes(item.priority)
-  ).length;
-  const displayedTickets =
-    adminMode && showOverdueOnly
-      ? tickets.filter((item) => isOverdue(item))
-      : tickets;
+  const overdueCount      = tickets.filter(isOverdue).length;
+  const escalatedCount    = tickets.filter((t) => t.status === "escalated").length;
+  const highPriorityCount = tickets.filter((t) => ["high", "urgent"].includes(t.priority)).length;
+  const displayed         = adminMode && showOverdueOnly ? tickets.filter(isOverdue) : tickets;
 
   const baseColumns = [
+    { key: "title",    label: "Title",    render: (t: TicketItem) => <span className="font-medium text-zinc-900">{t.title}</span> },
+    { key: "type",     label: "Type",     render: (t: TicketItem) => <span className="capitalize text-sm">{t.type}</span> },
+    { key: "priority", label: "Priority", render: (t: TicketItem) => <StatusBadge label={t.priority} /> },
+    { key: "status",   label: "Status",   render: (t: TicketItem) => <StatusBadge label={t.status} /> },
     {
-      key: "title",
-      label: "Title",
-      render: (ticket: TicketItem) => (
-        <span className="font-medium text-zinc-900">{ticket.title}</span>
-      ),
-    },
-    { key: "type", label: "Type", render: (ticket: TicketItem) => ticket.type },
-    {
-      key: "priority",
-      label: "Priority",
-      render: (ticket: TicketItem) => ticket.priority,
-    },
-    {
-      key: "status",
-      label: "Status",
-      render: (ticket: TicketItem) => <StatusBadge label={ticket.status} />,
-    },
-    {
-      key: "due_date",
-      label: "Due Date",
-      render: (ticket: TicketItem) =>
-        ticket.due_date ? (
-          <span className={isOverdue(ticket) ? "font-medium text-red-700" : ""}>
-            {new Date(ticket.due_date).toLocaleDateString()}
-          </span>
-        ) : (
-          "-"
-        ),
+      key: "due_date", label: "Due",
+      render: (t: TicketItem) => t.due_date
+        ? <span className={isOverdue(t) ? "font-semibold text-red-700" : ""}>{new Date(t.due_date).toLocaleDateString()}</span>
+        : <span className="text-zinc-400">—</span>,
     },
   ];
 
-  const adminColumns = adminMode
-    ? [
-        {
-          key: "assignee",
-          label: "Assignee",
-          render: (ticket: TicketItem) => ticket.assigned_to ?? "Unassigned",
-        },
-        {
-          key: "escalation",
-          label: "Escalation",
-          render: (ticket: TicketItem) => String(ticket.escalation_level ?? 0),
-        },
-      ]
-    : [];
+  const adminColumns = adminMode ? [
+    { key: "assignee",   label: "Assignee",   render: (t: TicketItem) => <span className="text-xs text-zinc-500">{t.assigned_to ?? "Unassigned"}</span> },
+    { key: "escalation", label: "Escalation", render: (t: TicketItem) => <span className="tabular-nums">{t.escalation_level ?? 0}</span> },
+  ] : [];
 
   const endingColumns = [
+    { key: "created", label: "Created", render: (t: TicketItem) => <span className="text-xs text-zinc-400">{t.created_at ? new Date(t.created_at).toLocaleString() : "—"}</span> },
+  ];
+
+  const actionColumns = adminMode ? [
     {
-      key: "created",
-      label: "Created",
-      render: (ticket: TicketItem) =>
-        ticket.created_at ? new Date(ticket.created_at).toLocaleString() : "-",
+      key: "actions", label: "Actions",
+      render: (ticket: TicketItem) => (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <select
+            value={ticket.status}
+            onChange={(e) => void updateStatus(ticket._id, e.target.value as (typeof statuses)[number])}
+            className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs outline-none focus:border-zinc-400"
+          >
+            {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <input
+            value={assigneeDrafts[ticket._id] ?? ""}
+            onChange={(e) => setAssigneeDrafts((prev) => ({ ...prev, [ticket._id]: e.target.value }))}
+            placeholder="User ID…"
+            className="w-28 rounded-lg border border-zinc-200 px-2 py-1 text-xs outline-none focus:border-zinc-400"
+          />
+          <button
+            type="button"
+            onClick={() => { const v = assigneeDrafts[ticket._id]; if (v?.trim()) void assignTicket(ticket._id, v.trim()); }}
+            disabled={!assigneeDrafts[ticket._id]?.trim()}
+            className="cp-btn-secondary px-2 py-1 text-xs disabled:opacity-40"
+          >
+            Assign
+          </button>
+          <button
+            type="button"
+            onClick={() => void escalateTicket(ticket._id)}
+            className="cp-btn px-2 py-1 text-xs border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+          >
+            Escalate
+          </button>
+        </div>
+      ),
     },
-  ];
+  ] : [];
 
-  const actionColumns = adminMode
-    ? [
-        {
-          key: "actions",
-          label: "Actions",
-          render: (ticket: TicketItem) => (
-            <div className="flex items-center gap-2">
-              <select
-                value={ticket.status}
-                onChange={(event) =>
-                  void updateStatus(
-                    ticket._id,
-                    event.target.value as (typeof statuses)[number]
-                  )
-                }
-                className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs"
-              >
-                {statuses.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={assigneeDrafts[ticket._id] ?? ""}
-                onChange={(event) =>
-                  setAssigneeDrafts((prev) => ({
-                    ...prev,
-                    [ticket._id]: event.target.value,
-                  }))
-                }
-                placeholder="Assignee user ID"
-                className="w-36 rounded-md border border-zinc-300 px-2 py-1 text-xs"
-              />
-              <button
-                onClick={() => {
-                  const assignedTo = assigneeDrafts[ticket._id];
-                  if (assignedTo && assignedTo.trim()) {
-                    void assignTicket(ticket._id, assignedTo.trim());
-                  }
-                }}
-                disabled={!assigneeDrafts[ticket._id]?.trim()}
-                className="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Assign
-              </button>
-              <button
-                onClick={() => void escalateTicket(ticket._id)}
-                className="rounded-md border border-amber-300 px-2 py-1 text-xs text-amber-700 hover:bg-amber-50"
-              >
-                Escalate
-              </button>
-            </div>
-          ),
-        },
-      ]
-    : [];
-
-  const columns = [
-    ...baseColumns,
-    ...adminColumns,
-    ...endingColumns,
-    ...actionColumns,
-  ];
+  const columns = [...baseColumns, ...adminColumns, ...endingColumns, ...actionColumns];
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-5">
       <PageHeader
-        title={adminMode ? "Admin Ticket Dashboard" : "My Tickets"}
-        subtitle={
-          adminMode
-            ? "Track, assign, and escalate ticket workflows."
-            : "Only your own tickets are shown. Filter by status/type and use pagination to browse history."
-        }
+        title={adminMode ? "Ticket Management" : "My Tickets"}
+        subtitle={adminMode
+          ? "Track, assign, and escalate ticket workflows across all users."
+          : "Your submitted requests. Filter by status or type to browse history."}
         actions={
-          <>
-            {adminMode ? (
-              <button
-                onClick={() => void runEscalationSweep()}
-                className="rounded-md border border-amber-300 px-3 py-1.5 text-sm text-amber-700 hover:bg-amber-50"
-              >
-                Run Escalation Sweep
-              </button>
-            ) : (
-              <Link
-                href="/tickets/new"
-                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-100"
-              >
-                New Request
-              </Link>
-            )}
-            <button
-              onClick={() => void loadTickets()}
-              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-100"
-            >
-              Refresh
-            </button>
-          </>
+          <div className="flex items-center gap-2">
+            {adminMode
+              ? <button type="button" onClick={() => void runEscalationSweep()} className="cp-btn px-3 py-1.5 text-xs border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100">Run Escalation Sweep</button>
+              : <Link href="/tickets/new" className="cp-btn-primary text-xs">+ New Request</Link>}
+            <button type="button" onClick={() => void loadTickets()} className="cp-btn-secondary text-xs">Refresh</button>
+          </div>
         }
       />
 
       {adminMode ? (
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-            <p className="text-xs uppercase tracking-wide text-red-700">
-              Overdue Attention
-            </p>
-            <p className="mt-1 text-2xl font-semibold text-red-800">
-              {overdueCount}
-            </p>
-          </div>
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-            <p className="text-xs uppercase tracking-wide text-amber-700">
-              High / Urgent
-            </p>
-            <p className="mt-1 text-2xl font-semibold text-amber-800">
-              {highPriorityCount}
-            </p>
-          </div>
-          <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
-            <p className="text-xs uppercase tracking-wide text-sky-700">
-              Escalated Queue
-            </p>
-            <p className="mt-1 text-2xl font-semibold text-sky-800">
-              {escalatedCount}
-            </p>
-          </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <MetricCard label="Overdue"     value={overdueCount}      accent="amber" />
+          <MetricCard label="High/Urgent" value={highPriorityCount} accent="sky" />
+          <MetricCard label="Escalated"   value={escalatedCount}    accent="indigo" />
         </div>
       ) : null}
 
       <FilterBar>
-        <select
-          value={statusFilter}
-          onChange={(event) => {
-            setStatusFilter(event.target.value);
-            setPage(1);
-          }}
-          className="rounded-md text-zinc-700 border border-zinc-300 bg-white px-3 py-1.5 text-sm"
-        >
+        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="cp-select w-auto">
           <option value="">All statuses</option>
-          {statuses.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
+          {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select
-          value={typeFilter}
-          onChange={(event) => {
-            setTypeFilter(event.target.value);
-            setPage(1);
-          }}
-          className="rounded-md text-zinc-700 border border-zinc-300 bg-white px-3 py-1.5 text-sm"
-        >
+        <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }} className="cp-select w-auto">
           <option value="">All types</option>
-          {ticketTypes.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
+          {ticketTypes.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
-        <div className="ml-auto text-xs text-zinc-500">Total: {totalItems}</div>
         {adminMode ? (
-          <button
-            type="button"
-            onClick={() => setShowOverdueOnly((prev) => !prev)}
-            className="rounded-md text-zinc-500 border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100"
-          >
-            {showOverdueOnly ? "Show All" : "Show Overdue Only"}
+          <button type="button" onClick={() => setShowOverdueOnly((v) => !v)} className={`cp-btn-secondary text-xs ${showOverdueOnly ? "ring-2 ring-amber-300" : ""}`}>
+            {showOverdueOnly ? "Show All" : "Overdue Only"}
           </button>
         ) : null}
+        <span className="ml-auto text-xs text-zinc-400">{totalItems} total</span>
       </FilterBar>
 
-      {loading ? (
-        <InlineAlert tone="info" message="Loading tickets..." />
-      ) : null}
-      {error ? <InlineAlert tone="error" message={error} /> : null}
+      {loading ? <InlineAlert tone="info"    message="Loading tickets…" /> : null}
+      {error   ? <InlineAlert tone="error"   message={error} /> : null}
       {message ? <InlineAlert tone="success" message={message} /> : null}
 
-      {!loading && displayedTickets.length === 0 ? (
+      {!loading && displayed.length === 0 ? (
         <EmptyState
-          title={
-            showOverdueOnly
-              ? "No overdue tickets in this page"
-              : "No tickets found"
-          }
-          description={
-            showOverdueOnly
-              ? "Try another page or remove overdue-only mode."
-              : "Try adjusting filters or create a new request."
-          }
+          title={showOverdueOnly ? "No overdue tickets on this page" : "No tickets found"}
+          description={showOverdueOnly ? "Try another page or remove overdue-only filter." : "Adjust filters or create a new request."}
         />
       ) : null}
 
-      {!loading && displayedTickets.length > 0 ? (
+      {!loading && displayed.length > 0 ? (
         <>
           <EntityTable
             columns={columns}
-            rows={displayedTickets}
+            rows={displayed}
             rowKey={(row) => row._id}
-            minWidthClassName={adminMode ? "min-w-[980px]" : "min-w-[720px]"}
+            minWidthClassName={adminMode ? "min-w-[1050px]" : "min-w-[720px]"}
           />
           <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-zinc-600">
-              Page {page} / {Math.max(1, totalPages)}
-            </span>
-            <button
-              type="button"
-              disabled={page >= totalPages}
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Next
-            </button>
+            <button type="button" disabled={page <= 1}          onClick={() => setPage((p) => p - 1)} className="cp-btn-secondary text-xs disabled:opacity-40">← Prev</button>
+            <span className="text-xs text-zinc-400">{page} / {Math.max(1, totalPages)}</span>
+            <button type="button" disabled={page >= totalPages}  onClick={() => setPage((p) => p + 1)} className="cp-btn-secondary text-xs disabled:opacity-40">Next →</button>
           </div>
         </>
       ) : null}

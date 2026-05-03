@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import EmptyState from "@/components/ui/EmptyState";
+import EmptyState  from "@/components/ui/EmptyState";
 import EntityTable from "@/components/ui/EntityTable";
-import FilterBar from "@/components/ui/FilterBar";
+import FilterBar   from "@/components/ui/FilterBar";
 import InlineAlert from "@/components/ui/InlineAlert";
-import PageHeader from "@/components/ui/PageHeader";
+import PageHeader  from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 
 type ScheduleItem = {
@@ -23,208 +23,104 @@ type ScheduleItem = {
 
 type AppRole = "student" | "faculty" | "admin" | "registrar";
 
-type ScheduleViewerClientProps = {
-  role?: AppRole;
-};
+const dayOptions = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-const dayOptions = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-];
+export default function ScheduleViewerClient({ role }: { role?: AppRole }) {
+  const [schedules,   setSchedules]   = useState<ScheduleItem[]>([]);
+  const [semester,    setSemester]    = useState("");
+  const [day,         setDay]         = useState("");
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState<string | null>(null);
+  const [page,        setPage]        = useState(1);
+  const [totalPages,  setTotalPages]  = useState(1);
+  const [totalItems,  setTotalItems]  = useState(0);
 
-export default function ScheduleViewerClient({
-  role,
-}: ScheduleViewerClientProps) {
-  const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
-  const [semester, setSemester] = useState("");
-  const [day, setDay] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
+  const isStudent = role === "student";
 
-  const isStudentView = role === "student";
-  const subtitle = isStudentView
-    ? "Browse your class/exam schedule. Use filters to find specific days or semester entries."
-    : "View and filter schedule records.";
-
-  const loadSchedules = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-
-    const query = new URLSearchParams();
-    if (semester) query.set("semester", semester);
-    if (day) query.set("day", day);
-    query.set("limit", "10");
-    query.set("page", String(page));
-
+    const q = new URLSearchParams({ limit: "10", page: String(page) });
+    if (semester) q.set("semester", semester);
+    if (day)      q.set("day", day);
     try {
-      const response = await fetch(`/api/schedules?${query.toString()}`);
-      const payload = (await response.json()) as {
-        schedules?: ScheduleItem[];
-        total?: number;
-        total_pages?: number;
-        error?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to load schedules.");
-      }
-
+      const res     = await fetch(`/api/schedules?${q}`);
+      const payload = (await res.json()) as { schedules?: ScheduleItem[]; total?: number; total_pages?: number; error?: string };
+      if (!res.ok) throw new Error(payload.error ?? "Failed to load schedules.");
       setSchedules(payload.schedules ?? []);
       setTotalItems(payload.total ?? 0);
       setTotalPages(payload.total_pages ?? 1);
-    } catch (loadError) {
-      const message =
-        loadError instanceof Error
-          ? loadError.message
-          : "Failed to load schedules.";
-      setError(message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load schedules.");
     } finally {
       setLoading(false);
     }
   }, [day, page, semester]);
 
-  useEffect(() => {
-    void loadSchedules();
-  }, [loadSchedules]);
+  useEffect(() => { void load(); }, [load]);
 
   const columns = [
-    {
-      key: "type",
-      label: "Type",
-      render: (item: ScheduleItem) => item.schedule_type,
-    },
-    { key: "day", label: "Day", render: (item: ScheduleItem) => item.day },
-    {
-      key: "date",
-      label: "Date",
-      render: (item: ScheduleItem) =>
-        item.date ? new Date(item.date).toLocaleDateString() : "-",
-    },
-    {
-      key: "time",
-      label: "Time",
-      render: (item: ScheduleItem) => `${item.start_time} - ${item.end_time}`,
-    },
-    {
-      key: "semester",
-      label: "Semester",
-      render: (item: ScheduleItem) => item.semester,
-    },
-    {
-      key: "section",
-      label: "Section",
-      render: (item: ScheduleItem) => item.section,
-    },
-    {
-      key: "status",
-      label: "Status",
-      render: (item: ScheduleItem) => <StatusBadge label={item.status} />,
-    },
+    { key: "type",     label: "Type",     render: (s: ScheduleItem) => <StatusBadge label={s.schedule_type} tone="default" /> },
+    { key: "day",      label: "Day",      render: (s: ScheduleItem) => s.day },
+    { key: "date",     label: "Date",     render: (s: ScheduleItem) => s.date ? new Date(s.date).toLocaleDateString() : <span className="text-zinc-400">—</span> },
+    { key: "time",     label: "Time",     render: (s: ScheduleItem) => `${s.start_time} – ${s.end_time}` },
+    { key: "semester", label: "Semester", render: (s: ScheduleItem) => s.semester },
+    { key: "section",  label: "Section",  render: (s: ScheduleItem) => s.section },
+    { key: "status",   label: "Status",   render: (s: ScheduleItem) => <StatusBadge label={s.status} /> },
   ];
 
   return (
-    <section className="space-y-4">
-      <PageHeader title="Schedule Viewer" subtitle={subtitle} />
+    <section className="space-y-5">
+      <PageHeader
+        title="Schedule Viewer"
+        subtitle={isStudent
+          ? "Browse your class and exam schedule. Filter by day or semester."
+          : "View and filter published schedule records."}
+      />
 
       <FilterBar>
         <input
           value={semester}
-          onChange={(event) => {
-            setSemester(event.target.value);
-            setPage(1);
-          }}
-          placeholder="Filter by semester"
-          className="rounded-md border text-zinc-700 border-zinc-300 px-3 py-1.5 text-sm"
+          onChange={(e) => { setSemester(e.target.value); setPage(1); }}
+          placeholder="Filter by semester…"
+          className="cp-input w-44"
         />
         <select
           value={day}
-          onChange={(event) => {
-            setDay(event.target.value);
-            setPage(1);
-          }}
-          className="rounded-md text-zinc-700 border border-zinc-300 bg-white px-3 py-1.5 text-sm"
+          onChange={(e) => { setDay(e.target.value); setPage(1); }}
+          className="cp-select w-auto"
         >
           <option value="">All days</option>
-          {dayOptions.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
+          {dayOptions.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
-        <button
-          onClick={() => void loadSchedules()}
-          className="rounded-md text-zinc-700 border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100"
-        >
-          Refresh
-        </button>
-        {semester || day ? (
-          <button
-            type="button"
-            onClick={() => {
-              setSemester("");
-              setDay("");
-              setPage(1);
-            }}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100"
-          >
-            Clear Filters
+        <button type="button" onClick={() => void load()} className="cp-btn-secondary text-xs">Refresh</button>
+        {(semester || day) ? (
+          <button type="button" onClick={() => { setSemester(""); setDay(""); setPage(1); }} className="cp-btn-ghost text-xs text-zinc-400">
+            × Clear filters
           </button>
         ) : null}
-        <div className="ml-auto text-xs text-zinc-500">
-          Showing {schedules.length} of {totalItems}
-        </div>
+        <span className="ml-auto text-xs text-zinc-400">{schedules.length} of {totalItems}</span>
       </FilterBar>
 
-      {loading ? (
-        <InlineAlert tone="info" message="Loading schedules..." />
-      ) : null}
-      {error ? <InlineAlert tone="error" message={error} /> : null}
+      {loading ? <InlineAlert tone="info"  message="Loading schedules…" /> : null}
+      {error   ? <InlineAlert tone="error" message={error} /> : null}
+
       {!loading && schedules.length === 0 ? (
         <EmptyState
           title="No schedules found"
-          description={
-            isStudentView
-              ? "No matching schedule rows for your current filters. Try another day or semester."
-              : "Try adjusting filters."
-          }
+          description={isStudent
+            ? "No matching schedule rows for your filters. Try another day or semester."
+            : "Try adjusting filters."}
         />
       ) : null}
 
       {!loading && schedules.length > 0 ? (
         <>
-          <EntityTable
-            columns={columns}
-            rows={schedules}
-            rowKey={(item) => item._id}
-          />
+          <EntityTable columns={columns} rows={schedules} rowKey={(s) => s._id} />
           <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-zinc-600">
-              Page {page} / {Math.max(1, totalPages)}
-            </span>
-            <button
-              type="button"
-              disabled={page >= totalPages}
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Next
-            </button>
+            <button type="button" disabled={page <= 1}          onClick={() => setPage((p) => p - 1)} className="cp-btn-secondary text-xs disabled:opacity-40">← Prev</button>
+            <span className="text-xs text-zinc-400">{page} / {Math.max(1, totalPages)}</span>
+            <button type="button" disabled={page >= totalPages}  onClick={() => setPage((p) => p + 1)} className="cp-btn-secondary text-xs disabled:opacity-40">Next →</button>
           </div>
         </>
       ) : null}
