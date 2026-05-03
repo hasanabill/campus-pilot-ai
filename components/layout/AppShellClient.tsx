@@ -27,6 +27,7 @@ const navItems: NavItem[] = [
   { href: "/dashboard",           label: "Dashboard",        icon: "dashboard",     section: "core",   roles: ["student", "faculty", "admin", "registrar"] },
   { href: "/chat",                label: "AI Chat",          icon: "chat",          section: "core",   roles: ["student", "faculty", "admin", "registrar"] },
   { href: "/notifications",       label: "Notifications",    icon: "bell",          section: "core",   roles: ["student", "faculty", "admin", "registrar"] },
+  { href: "/notices",             label: "Notices",          icon: "bell",          section: "core",   roles: ["student", "faculty", "admin", "registrar"] },
   { href: "/schedules",           label: "Schedules",        icon: "calendar",      section: "core",   roles: ["student", "faculty", "admin", "registrar"] },
   /* ── Student ── */
   { href: "/tickets/new",         label: "New Request",      icon: "plus",          section: "student", roles: ["student"] },
@@ -36,8 +37,11 @@ const navItems: NavItem[] = [
   { href: "/dashboard/schedules", label: "Schedule Admin",   icon: "calendarEdit",  section: "mgmt",   roles: ["admin"] },
   { href: "/dashboard/documents", label: "Document Center",  icon: "doc",           section: "mgmt",   roles: ["faculty", "admin", "registrar"] },
   { href: "/dashboard/approvals", label: "Approvals",        icon: "check",         section: "mgmt",   roles: ["admin", "registrar"] },
+  { href: "/dashboard/notices",   label: "Notice Composer",  icon: "bell",          section: "mgmt",   roles: ["admin", "registrar"] },
   { href: "/dashboard/reports",   label: "Reports",          icon: "chart",         section: "mgmt",   roles: ["faculty", "admin", "registrar"] },
   /* ── Admin ── */
+  { href: "/dashboard/master-data", label: "Master Data",     icon: "activity",      section: "admin",  roles: ["admin"] },
+  { href: "/dashboard/faqs",      label: "FAQs",             icon: "chat",          section: "admin",  roles: ["admin"] },
   { href: "/dashboard/kb",        label: "KB Upload",        icon: "upload",        section: "admin",  roles: ["admin"] },
   { href: "/dashboard/activity",  label: "Activity Log",     icon: "activity",      section: "admin",  roles: ["admin"] },
   { href: "/register",            label: "Create User",      icon: "user",          section: "admin",  roles: ["admin"] },

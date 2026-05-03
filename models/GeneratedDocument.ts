@@ -2,7 +2,7 @@ import { model, models, Schema } from "mongoose";
 
 const generatedDocumentSchema = new Schema(
   {
-    template_id: { type: Schema.Types.ObjectId, ref: "DocumentTemplate", required: true },
+    template_id: { type: Schema.Types.ObjectId, ref: "DocumentTemplate", default: null },
     requested_by: { type: Schema.Types.ObjectId, ref: "User", required: true },
     related_ticket_id: { type: Schema.Types.ObjectId, ref: "Ticket", default: null },
     ai_prompt_snapshot: { type: String, required: true },

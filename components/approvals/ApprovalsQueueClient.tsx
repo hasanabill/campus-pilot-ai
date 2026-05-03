@@ -10,10 +10,12 @@ import StatusBadge from "@/components/ui/StatusBadge";
 
 type ApprovalItem = {
   _id?: string;
-  message: string;
-  reference_id?: string | null;
+  entity_type: "ticket" | "generated_document" | "schedule_change";
+  entity_id: string;
+  stage: string;
+  decision: "pending" | "approved" | "rejected";
+  comments?: string | null;
   created_at?: string | null;
-  is_read: boolean;
 };
 
 export default function ApprovalsQueueClient() {
@@ -29,11 +31,11 @@ export default function ApprovalsQueueClient() {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const q   = new URLSearchParams({ type: "approval_required", limit: "10", page: String(page) });
-      const res = await fetch(`/api/notifications?${q}`);
-      const payload = (await res.json()) as { notifications?: ApprovalItem[]; total?: number; total_pages?: number; error?: string };
+      const q   = new URLSearchParams({ decision: "pending", limit: "10", page: String(page) });
+      const res = await fetch(`/api/approvals?${q}`);
+      const payload = (await res.json()) as { approvals?: ApprovalItem[]; total?: number; total_pages?: number; error?: string };
       if (!res.ok) throw new Error(payload.error ?? "Failed to load approvals.");
-      const list = payload.notifications ?? [];
+      const list = payload.approvals ?? [];
       setItems(list);
       setTotal(payload.total ?? 0);
       setTotalPages(payload.total_pages ?? 1);
@@ -44,6 +46,25 @@ export default function ApprovalsQueueClient() {
       setLoading(false);
     }
   }, [page]);
+
+  async function decideSelected(decision: "approved" | "rejected") {
+    if (!selected?._id) return;
+    setNotice(null);
+    setError(null);
+    try {
+      const res = await fetch(`/api/approvals/${selected._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision, comments: `${decision} from approvals queue` }),
+      });
+      const payload = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(payload.error ?? "Approval update failed.");
+      setNotice(`Approval ${decision}.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Approval update failed.");
+    }
+  }
 
   useEffect(() => { void load(); }, [load]);
 
@@ -58,13 +79,13 @@ export default function ApprovalsQueueClient() {
       />
 
       <FilterBar>
-        <span className="text-xs text-zinc-400">Source: approval_required notifications</span>
+        <span className="text-xs text-zinc-400">Source: real Approval records</span>
         <span className="ml-auto text-xs text-zinc-400">{total} pending</span>
       </FilterBar>
 
       {loading ? <InlineAlert tone="info"    message="Loading approval queue…" /> : null}
       {error   ? <InlineAlert tone="error"   message={error} /> : null}
-      {notice  ? <InlineAlert tone="warning" message={notice} /> : null}
+      {notice  ? <InlineAlert tone="success" message={notice} /> : null}
 
       {!loading && !error && items.length === 0 ? (
         <EmptyState
@@ -81,15 +102,17 @@ export default function ApprovalsQueueClient() {
               {items.map((item) => {
                 const active = item._id === selectedId;
                 return (
-                  <li key={item._id ?? item.message}>
+                  <li key={item._id ?? item.entity_id}>
                     <button
                       type="button"
                       onClick={() => setSelectedId(item._id ?? null)}
                       className={`w-full flex items-start gap-3 px-4 py-3 text-left transition ${active ? "bg-zinc-50" : "hover:bg-zinc-50/60"}`}
                     >
-                      <StatusBadge label={item.is_read ? "reviewed" : "pending"} tone={item.is_read ? "muted" : "warning"} />
+                      <StatusBadge label={item.decision} tone="warning" />
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-zinc-900 truncate">{item.message}</p>
+                        <p className="text-sm font-medium text-zinc-900 truncate">
+                          {item.entity_type.replaceAll("_", " ")} · {item.stage.replaceAll("_", " ")}
+                        </p>
                         <p className="mt-0.5 text-xs text-zinc-400">{item.created_at ? new Date(item.created_at).toLocaleString() : "—"}</p>
                       </div>
                     </button>
@@ -110,32 +133,34 @@ export default function ApprovalsQueueClient() {
             <p className="cp-section-title">Item details</p>
             {selected ? (
               <>
-                <p className="text-sm text-zinc-900">{selected.message}</p>
+                <p className="text-sm text-zinc-900">
+                  Review {selected.entity_type.replaceAll("_", " ")} at stage {selected.stage.replaceAll("_", " ")}.
+                </p>
                 <div className="grid gap-2">
                   <div className="cp-card-2">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Reference ID</p>
-                    <p className="mt-0.5 text-sm font-mono text-zinc-700">{selected.reference_id ?? "—"}</p>
+                    <p className="mt-0.5 text-sm font-mono text-zinc-700">{selected.entity_id ?? "—"}</p>
                   </div>
                   <div className="cp-card-2">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Created</p>
                     <p className="mt-0.5 text-sm text-zinc-700">{selected.created_at ? new Date(selected.created_at).toLocaleString() : "—"}</p>
                   </div>
                 </div>
-                <StatusBadge label={selected.is_read ? "reviewed" : "pending"} tone={selected.is_read ? "muted" : "warning"} />
+                <StatusBadge label={selected.decision} tone="warning" />
                 <div className="flex gap-2 pt-1">
                   <button
                     type="button"
-                    onClick={() => setNotice("Approve action scaffolded — connect a dedicated approvals mutation API to activate.")}
+                    onClick={() => void decideSelected("approved")}
                     className="cp-btn flex-1 border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs py-2"
                   >
-                    ✓ Approve
+                    Approve
                   </button>
                   <button
                     type="button"
-                    onClick={() => setNotice("Reject action scaffolded — connect a dedicated approvals mutation API to activate.")}
+                    onClick={() => void decideSelected("rejected")}
                     className="cp-btn flex-1 border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 text-xs py-2"
                   >
-                    ✕ Reject
+                    Reject
                   </button>
                 </div>
               </>

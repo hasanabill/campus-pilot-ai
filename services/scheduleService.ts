@@ -4,6 +4,7 @@ import { z } from "zod";
 import { connectToDatabase } from "@/lib/mongodb";
 import Faculty from "@/models/Faculty";
 import Schedule from "@/models/Schedule";
+import ScheduleChangeLog from "@/models/ScheduleChangeLog";
 import { notifyScheduleChange } from "@/services/notificationService";
 
 const scheduleTypes = ["class", "exam"] as const;
@@ -34,6 +35,13 @@ export const listSchedulesQuerySchema = z.object({
   day: z.string().optional(),
   limit: z.number().int().min(1).max(200).optional(),
   page: z.number().int().min(1).optional(),
+});
+
+export const updateScheduleSchema = createScheduleSchema.partial().extend({
+  reason: z
+    .enum(["faculty_unavailable", "holiday", "emergency", "optimization", "conflict_fix"])
+    .optional()
+    .default("conflict_fix"),
 });
 
 function requireObjectId(id: string, field: string): Types.ObjectId {
@@ -259,4 +267,121 @@ export async function listSchedules(query: z.infer<typeof listSchedulesQuerySche
     limit,
     total_pages: Math.ceil(total / limit),
   };
+}
+
+function scheduleSlot(schedule: {
+  day?: string;
+  date?: Date | string | null;
+  start_time?: string;
+  end_time?: string;
+  room_id?: unknown;
+  faculty_id?: unknown;
+  status?: string;
+}) {
+  return {
+    day: schedule.day,
+    date: schedule.date,
+    start_time: schedule.start_time,
+    end_time: schedule.end_time,
+    room_id: schedule.room_id ? String(schedule.room_id) : null,
+    faculty_id: schedule.faculty_id ? String(schedule.faculty_id) : null,
+    status: schedule.status,
+  };
+}
+
+export async function getScheduleById(scheduleId: string) {
+  await connectToDatabase();
+  return Schedule.findById(requireObjectId(scheduleId, "schedule id")).lean();
+}
+
+export async function updateSchedule(
+  requester: { userId: string; role: AppRole },
+  scheduleId: string,
+  payload: z.infer<typeof updateScheduleSchema>,
+) {
+  if (!canManageSchedules(requester.role)) {
+    throw new Error("Only admin can update schedules.");
+  }
+
+  const parsed = updateScheduleSchema.parse(payload);
+  await connectToDatabase();
+
+  const existing = await Schedule.findById(requireObjectId(scheduleId, "schedule id"));
+  if (!existing) return null;
+
+  const oldSlot = scheduleSlot(existing);
+  const nextPayload = {
+    schedule_type: parsed.schedule_type ?? existing.schedule_type,
+    course_id: parsed.course_id ?? String(existing.course_id),
+    faculty_id: parsed.faculty_id ?? String(existing.faculty_id),
+    room_id: parsed.room_id ?? String(existing.room_id),
+    day: parsed.day ?? existing.day,
+    date:
+      parsed.date !== undefined
+        ? parsed.date
+        : existing.date
+          ? existing.date.toISOString()
+          : null,
+    start_time: parsed.start_time ?? existing.start_time,
+    end_time: parsed.end_time ?? existing.end_time,
+    semester: parsed.semester ?? existing.semester,
+    section: parsed.section ?? existing.section,
+    status: parsed.status ?? existing.status,
+    allow_conflicts: parsed.allow_conflicts ?? false,
+  };
+
+  const warnings = await detectConflicts(nextPayload);
+  const filteredWarnings = warnings.filter(
+    (warning) => warning.conflicting_schedule_id !== String(existing._id),
+  );
+  if (filteredWarnings.length > 0 && !nextPayload.allow_conflicts) {
+    throw new ScheduleConflictError(filteredWarnings);
+  }
+
+  if (parsed.schedule_type !== undefined) existing.schedule_type = parsed.schedule_type;
+  if (parsed.course_id !== undefined) existing.course_id = requireObjectId(parsed.course_id, "course_id");
+  if (parsed.faculty_id !== undefined) existing.faculty_id = requireObjectId(parsed.faculty_id, "faculty_id");
+  if (parsed.room_id !== undefined) existing.room_id = requireObjectId(parsed.room_id, "room_id");
+  if (parsed.day !== undefined) existing.day = parsed.day;
+  if (parsed.date !== undefined) existing.date = parsed.date ? new Date(parsed.date) : null;
+  if (parsed.start_time !== undefined) existing.start_time = parsed.start_time;
+  if (parsed.end_time !== undefined) existing.end_time = parsed.end_time;
+  if (parsed.semester !== undefined) existing.semester = parsed.semester;
+  if (parsed.section !== undefined) existing.section = parsed.section;
+  if (parsed.status !== undefined) existing.status = parsed.status;
+
+  await existing.save();
+
+  await ScheduleChangeLog.create({
+    schedule_id: existing._id,
+    reason: parsed.reason,
+    old_slot: oldSlot,
+    new_slot: scheduleSlot(existing),
+    changed_by: requireObjectId(requester.userId, "user id"),
+  });
+
+  try {
+    const facultyProfile = await Faculty.findById(existing.faculty_id)
+      .select("user_id")
+      .lean<{ user_id: Types.ObjectId } | null>();
+    if (facultyProfile) {
+      await notifyScheduleChange({
+        faculty_user_id: String(facultyProfile.user_id),
+        schedule_id: String(existing._id),
+        message: `A schedule (${existing.schedule_type}) was updated for ${existing.day}.`,
+      });
+    }
+  } catch {
+    // Notification failure should not block schedule update.
+  }
+
+  return { schedule: existing.toObject(), warnings: filteredWarnings };
+}
+
+export async function deleteSchedule(requester: { role: AppRole }, scheduleId: string) {
+  if (!canManageSchedules(requester.role)) {
+    throw new Error("Only admin can delete schedules.");
+  }
+  await connectToDatabase();
+  return Schedule.findByIdAndDelete(requireObjectId(scheduleId, "schedule id")).lean();
 }

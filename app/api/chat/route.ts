@@ -33,6 +33,7 @@ export async function POST(request: Request) {
     const result = await createChatResponseAndLog({
       ...parsed.data,
       user_id: session.user.id,
+      role: session.user.role,
       department_id: session.user.department_id,
     });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import InlineAlert from "@/components/ui/InlineAlert";
 import PageHeader  from "@/components/ui/PageHeader";
@@ -14,6 +14,16 @@ type ConflictWarning = {
   type: "room_conflict" | "faculty_conflict" | "time_conflict";
   conflicting_schedule_id: string;
   message: string;
+};
+
+type MasterOption = {
+  _id: string;
+  name?: string;
+  code?: string;
+  employee_id?: string;
+  designation?: string;
+  room_code?: string;
+  building?: string;
 };
 
 function warningTone(type: ConflictWarning["type"]): "danger" | "warning" {
@@ -37,6 +47,28 @@ export default function ScheduleEditorForm() {
   const [error,        setError]        = useState<string | null>(null);
   const [warnings,     setWarnings]     = useState<ConflictWarning[]>([]);
   const [attemptedOverride, setAttemptedOverride] = useState(false);
+  const [courses,      setCourses]      = useState<MasterOption[]>([]);
+  const [faculty,      setFaculty]      = useState<MasterOption[]>([]);
+  const [rooms,        setRooms]        = useState<MasterOption[]>([]);
+
+  useEffect(() => {
+    async function loadOptions() {
+      const [courseRes, facultyRes, roomRes] = await Promise.all([
+        fetch("/api/master-data/courses?limit=100"),
+        fetch("/api/master-data/faculty?limit=100"),
+        fetch("/api/master-data/rooms?limit=100"),
+      ]);
+      const [coursePayload, facultyPayload, roomPayload] = await Promise.all([
+        courseRes.json() as Promise<{ items?: MasterOption[] }>,
+        facultyRes.json() as Promise<{ items?: MasterOption[] }>,
+        roomRes.json() as Promise<{ items?: MasterOption[] }>,
+      ]);
+      setCourses(coursePayload.items ?? []);
+      setFaculty(facultyPayload.items ?? []);
+      setRooms(roomPayload.items ?? []);
+    }
+    void loadOptions();
+  }, []);
 
   async function submit(allowConflicts = false) {
     setLoading(true); setError(null); setMessage(null);
@@ -101,18 +133,33 @@ export default function ScheduleEditorForm() {
           </div>
 
           <div>
-            <label htmlFor="sched-course" className="cp-label">Course ID</label>
-            <input id="sched-course" required value={courseId} onChange={(e) => setCourseId(e.target.value)} placeholder="course_xxxx" className="cp-input" />
+            <label htmlFor="sched-course" className="cp-label">Course</label>
+            <select id="sched-course" required value={courseId} onChange={(e) => setCourseId(e.target.value)} className="cp-select">
+              <option value="">Select course</option>
+              {courses.map((course) => (
+                <option key={course._id} value={course._id}>{course.code ? `${course.code} - ${course.name}` : course.name}</option>
+              ))}
+            </select>
           </div>
 
           <div>
-            <label htmlFor="sched-faculty" className="cp-label">Faculty ID</label>
-            <input id="sched-faculty" required value={facultyId} onChange={(e) => setFacultyId(e.target.value)} placeholder="faculty_xxxx" className="cp-input" />
+            <label htmlFor="sched-faculty" className="cp-label">Faculty</label>
+            <select id="sched-faculty" required value={facultyId} onChange={(e) => setFacultyId(e.target.value)} className="cp-select">
+              <option value="">Select faculty</option>
+              {faculty.map((member) => (
+                <option key={member._id} value={member._id}>{member.employee_id ? `${member.employee_id} - ${member.designation}` : member._id}</option>
+              ))}
+            </select>
           </div>
 
           <div>
-            <label htmlFor="sched-room" className="cp-label">Room ID</label>
-            <input id="sched-room" required value={roomId} onChange={(e) => setRoomId(e.target.value)} placeholder="room_xxxx" className="cp-input" />
+            <label htmlFor="sched-room" className="cp-label">Room</label>
+            <select id="sched-room" required value={roomId} onChange={(e) => setRoomId(e.target.value)} className="cp-select">
+              <option value="">Select room</option>
+              {rooms.map((room) => (
+                <option key={room._id} value={room._id}>{room.room_code ? `${room.room_code} - ${room.building}` : room._id}</option>
+              ))}
+            </select>
           </div>
 
           <div>

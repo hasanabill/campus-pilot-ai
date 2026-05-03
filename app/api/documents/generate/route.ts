@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { Types } from "mongoose";
 
 import { auth } from "@/lib/auth";
+import GeneratedDocument from "@/models/GeneratedDocument";
+import { createDocumentApprovals } from "@/services/approvalService";
 import { generateDocumentBundle, generateDocumentSchema } from "@/services/documentService";
 import { notifyDocumentApprovalRequired } from "@/services/notificationService";
 import { uploadBufferToCloudinary } from "@/services/storageService";
@@ -46,11 +48,22 @@ export async function POST(request: Request) {
       resource_type: "raw",
       format: "pdf",
     });
-    const referenceId = new Types.ObjectId().toString();
+    const generatedDocument = await GeneratedDocument.create({
+      template_id: null,
+      requested_by: new Types.ObjectId(session.user.id),
+      related_ticket_id: null,
+      ai_prompt_snapshot: JSON.stringify(parsed.data),
+      generated_text: result.generated_text,
+      cloudinary_url: cloudinaryUpload.secure_url,
+      public_id: cloudinaryUpload.public_id,
+      status: "pending_approval",
+      approved_by: null,
+    });
+    await createDocumentApprovals({ entity_id: String(generatedDocument._id) });
 
     try {
       await notifyDocumentApprovalRequired({
-        document_reference_id: referenceId,
+        document_reference_id: String(generatedDocument._id),
         message: `Document "${parsed.data.title}" requires approval review.`,
       });
     } catch {

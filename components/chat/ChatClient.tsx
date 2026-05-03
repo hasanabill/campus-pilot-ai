@@ -7,7 +7,12 @@ import ChatMessageList from "@/components/chat/ChatMessageList";
 import InlineAlert from "@/components/ui/InlineAlert";
 
 type Message = { role: "user" | "assistant"; content: string };
-type ChatApiResponse = { answer: string; session_id: string };
+type ChatApiResponse = {
+  answer: string;
+  session_id: string;
+  routed_to_ticket_id?: string | null;
+  source?: "faq" | "knowledge_base";
+};
 type ChatClientProps = { userName?: string | null };
 
 const suggestedPrompts = [
@@ -23,6 +28,7 @@ export default function ChatClient({ userName }: ChatClientProps) {
   const [sessionId,         setSessionId]         = useState<string | undefined>(undefined);
   const [isLoading,         setIsLoading]         = useState(false);
   const [error,             setError]             = useState<string | null>(null);
+  const [notice,            setNotice]            = useState<string | null>(null);
   const [lastFailedQuestion, setLastFailedQuestion] = useState<string | null>(null);
 
   const history = useMemo(() => messages.slice(-10), [messages]);
@@ -34,6 +40,7 @@ export default function ChatClient({ userName }: ChatClientProps) {
     setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
     setQuestion("");
     setError(null);
+    setNotice(null);
     setLastFailedQuestion(null);
     setIsLoading(true);
 
@@ -52,6 +59,9 @@ export default function ChatClient({ userName }: ChatClientProps) {
 
       setSessionId(payload.session_id);
       setMessages((prev) => [...prev, { role: "assistant", content: payload.answer }]);
+      if (payload.source === "faq") {
+        setNotice("Answered from the managed FAQ library.");
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Chat request failed.";
       setError(msg);
@@ -67,6 +77,41 @@ export default function ChatClient({ userName }: ChatClientProps) {
     await submitQuestion(question);
   }
 
+  async function routeLastQuestionToTicket() {
+    const lastQuestion = [...messages].reverse().find((message) => message.role === "user")?.content;
+    if (!lastQuestion || isLoading) return;
+
+    setIsLoading(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: lastQuestion,
+          session_id: sessionId,
+          history,
+          create_ticket: true,
+        }),
+      });
+      const payload = (await res.json()) as ChatApiResponse | { error?: string };
+      if (!res.ok || !("answer" in payload)) {
+        throw new Error("error" in payload && payload.error ? payload.error : "Ticket routing failed.");
+      }
+      setSessionId(payload.session_id);
+      setNotice(
+        payload.routed_to_ticket_id
+          ? `Created ticket from chat: ${payload.routed_to_ticket_id}`
+          : "Chat was processed, but no ticket was created.",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ticket routing failed.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return (
     <div className="mx-auto flex h-[calc(100vh-5rem)] w-full max-w-4xl flex-col">
 
@@ -80,13 +125,23 @@ export default function ChatClient({ userName }: ChatClientProps) {
           </p>
         </div>
         {messages.length > 0 && (
+          <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => { setMessages([]); setSessionId(undefined); setError(null); }}
+            onClick={() => void routeLastQuestionToTicket()}
+            disabled={isLoading}
+            className="cp-btn-secondary text-xs"
+          >
+            Create ticket from last question
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMessages([]); setSessionId(undefined); setError(null); setNotice(null); }}
             className="cp-btn-secondary text-xs"
           >
             Clear chat
           </button>
+          </div>
         )}
       </div>
 
@@ -116,6 +171,11 @@ export default function ChatClient({ userName }: ChatClientProps) {
       {error && (
         <div className="mt-3">
           <InlineAlert message={error} tone="error" />
+        </div>
+      )}
+      {notice && (
+        <div className="mt-3">
+          <InlineAlert message={notice} tone="success" />
         </div>
       )}
       {lastFailedQuestion && (
