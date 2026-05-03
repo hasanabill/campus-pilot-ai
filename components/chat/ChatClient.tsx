@@ -6,88 +6,57 @@ import ChatInput from "@/components/chat/ChatInput";
 import ChatMessageList from "@/components/chat/ChatMessageList";
 import InlineAlert from "@/components/ui/InlineAlert";
 
-type Message = {
-  role: "user" | "assistant";
-  content: string;
-};
-
-type ChatClientProps = {
-  userName?: string | null;
-};
-
-type ChatApiResponse = {
-  answer: string;
-  session_id: string;
-};
+type Message = { role: "user" | "assistant"; content: string };
+type ChatApiResponse = { answer: string; session_id: string };
+type ChatClientProps = { userName?: string | null };
 
 const suggestedPrompts = [
   "What documents are needed for a transcript request?",
-  "Summarize this semester's class schedule policy.",
   "How do I apply for internship permission?",
+  "Summarize this semester's schedule policy.",
   "What is the ticket escalation workflow?",
 ];
 
 export default function ChatClient({ userName }: ChatClientProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [question, setQuestion] = useState("");
-  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [messages,          setMessages]          = useState<Message[]>([]);
+  const [question,          setQuestion]          = useState("");
+  const [sessionId,         setSessionId]         = useState<string | undefined>(undefined);
+  const [isLoading,         setIsLoading]         = useState(false);
+  const [error,             setError]             = useState<string | null>(null);
   const [lastFailedQuestion, setLastFailedQuestion] = useState<string | null>(null);
 
   const history = useMemo(() => messages.slice(-10), [messages]);
 
-  async function submitQuestion(rawText: string) {
-    const trimmed = rawText.trim();
-    if (trimmed.length < 2 || isLoading) {
-      return;
-    }
+  async function submitQuestion(raw: string) {
+    const trimmed = raw.trim();
+    if (trimmed.length < 2 || isLoading) return;
 
-    const userMessage: Message = { role: "user", content: trimmed };
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
     setQuestion("");
     setError(null);
     setLastFailedQuestion(null);
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/chat", {
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: trimmed,
-          session_id: sessionId,
-          history,
-        }),
+        body: JSON.stringify({ question: trimmed, session_id: sessionId, history }),
       });
 
-      const payload = (await response.json()) as
-        | ChatApiResponse
-        | {
-            error?: string;
-          };
+      const payload = (await res.json()) as ChatApiResponse | { error?: string };
 
-      if (!response.ok || !("answer" in payload)) {
-        throw new Error(
-          "error" in payload && payload.error ? payload.error : "Unable to process request.",
-        );
+      if (!res.ok || !("answer" in payload)) {
+        throw new Error("error" in payload && payload.error ? payload.error : "Unable to process request.");
       }
 
       setSessionId(payload.session_id);
       setMessages((prev) => [...prev, { role: "assistant", content: payload.answer }]);
-    } catch (requestError) {
-      const message =
-        requestError instanceof Error ? requestError.message : "Chat request failed.";
-      setError(message);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Chat request failed.";
+      setError(msg);
       setLastFailedQuestion(trimmed);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content:
-            "I could not complete your request. Please try again or contact the department office.",
-        },
-      ]);
+      setMessages((prev) => [...prev, { role: "assistant", content: "I couldn't complete that request. Please try again or contact the department office." }]);
     } finally {
       setIsLoading(false);
     }
@@ -98,68 +67,76 @@ export default function ChatClient({ userName }: ChatClientProps) {
     await submitQuestion(question);
   }
 
-  async function onRetryLastQuestion() {
-    if (!lastFailedQuestion) return;
-    await submitQuestion(lastFailedQuestion);
-  }
-
   return (
-    <div className="mx-auto flex h-[calc(100vh-9rem)] w-full max-w-4xl flex-col p-4 md:p-6">
-      <header className="mb-4">
-        <h1 className="text-2xl font-bold text-zinc-900">AI Chat Assistant</h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          {userName ? `Signed in as ${userName}. ` : ""}
-          Ask questions about courses, policies, schedules, and notices.
-        </p>
-      </header>
+    <div className="mx-auto flex h-[calc(100vh-5rem)] w-full max-w-4xl flex-col">
 
-      <div className="mb-4 rounded-lg border border-zinc-200 bg-white p-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-          Suggested prompts
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
+      {/* Header */}
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-zinc-900">AI Chat Assistant</h1>
+          <p className="mt-0.5 text-xs text-zinc-400">
+            {userName ? `Signed in as ${userName} · ` : ""}
+            Ask about policies, schedules, documents, and processes.
+          </p>
+        </div>
+        {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={() => { setMessages([]); setSessionId(undefined); setError(null); }}
+            className="cp-btn-secondary text-xs"
+          >
+            Clear chat
+          </button>
+        )}
+      </div>
+
+      {/* Suggested prompts */}
+      {messages.length === 0 && (
+        <div className="mb-4 flex flex-wrap gap-2">
           {suggestedPrompts.map((prompt) => (
             <button
               key={prompt}
               type="button"
               disabled={isLoading}
               onClick={() => void submitQuestion(prompt)}
-              className="rounded-full border border-zinc-300 px-3 py-1 text-xs text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+              className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-600 shadow-sm hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-50 transition"
             >
               {prompt}
             </button>
           ))}
         </div>
-      </div>
+      )}
 
-      <div className="min-h-0 flex-1">
+      {/* Messages */}
+      <div className="cp-card flex-1 min-h-0 p-0 overflow-hidden flex flex-col">
         <ChatMessageList messages={messages} isLoading={isLoading} />
       </div>
 
-      {error ? <InlineAlert message={error} tone="error" /> : null}
-      {lastFailedQuestion ? (
-        <div className="mt-2 flex items-center justify-between rounded-md border border-zinc-200 bg-white p-3">
-          <p className="text-xs text-zinc-600">
-            Last failed question: <span className="font-medium text-zinc-900">{lastFailedQuestion}</span>
+      {/* Error / retry */}
+      {error && (
+        <div className="mt-3">
+          <InlineAlert message={error} tone="error" />
+        </div>
+      )}
+      {lastFailedQuestion && (
+        <div className="mt-2 flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-2.5 shadow-sm">
+          <p className="text-xs text-zinc-500 min-w-0 truncate">
+            Failed: <span className="font-medium text-zinc-700">{lastFailedQuestion}</span>
           </p>
           <button
             type="button"
-            onClick={() => void onRetryLastQuestion()}
+            onClick={() => void submitQuestion(lastFailedQuestion)}
             disabled={isLoading}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
+            className="cp-btn-secondary ml-2 shrink-0 text-xs"
           >
             Retry
           </button>
         </div>
-      ) : null}
+      )}
 
-      <div className="sticky bottom-0 mt-3 border-t border-zinc-200 bg-zinc-50/95 pt-3 backdrop-blur supports-backdrop-filter:bg-zinc-50/85">
-        <ChatInput
-          value={question}
-          isLoading={isLoading}
-          onChange={setQuestion}
-          onSubmit={onSubmit}
-        />
+      {/* Input */}
+      <div className="mt-3 rounded-xl border border-zinc-200 bg-white p-3 shadow-sm">
+        <ChatInput value={question} isLoading={isLoading} onChange={setQuestion} onSubmit={onSubmit} />
       </div>
     </div>
   );

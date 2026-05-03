@@ -2,14 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import EmptyState from "@/components/ui/EmptyState";
-import EntityTable from "@/components/ui/EntityTable";
-import FilterBar from "@/components/ui/FilterBar";
+import EmptyState  from "@/components/ui/EmptyState";
+import FilterBar   from "@/components/ui/FilterBar";
 import InlineAlert from "@/components/ui/InlineAlert";
-import PageHeader from "@/components/ui/PageHeader";
+import PageHeader  from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 
-type ApprovalQueueItem = {
+type ApprovalItem = {
   _id?: string;
   message: string;
   reference_id?: string | null;
@@ -18,194 +17,132 @@ type ApprovalQueueItem = {
 };
 
 export default function ApprovalsQueueClient() {
-  const [items, setItems] = useState<ApprovalQueueItem[]>([]);
+  const [items,      setItems]      = useState<ApprovalItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState<string | null>(null);
+  const [notice,     setNotice]     = useState<string | null>(null);
+  const [page,       setPage]       = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
+  const [total,      setTotal]      = useState(0);
 
-  const loadApprovals = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
     try {
-      const query = new URLSearchParams();
-      query.set("type", "approval_required");
-      query.set("limit", "10");
-      query.set("page", String(page));
-
-      const response = await fetch(`/api/notifications?${query.toString()}`);
-      const payload = (await response.json()) as {
-        notifications?: ApprovalQueueItem[];
-        total?: number;
-        total_pages?: number;
-        error?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to load approval queue.");
-      }
-
+      const q   = new URLSearchParams({ type: "approval_required", limit: "10", page: String(page) });
+      const res = await fetch(`/api/notifications?${q}`);
+      const payload = (await res.json()) as { notifications?: ApprovalItem[]; total?: number; total_pages?: number; error?: string };
+      if (!res.ok) throw new Error(payload.error ?? "Failed to load approvals.");
       const list = payload.notifications ?? [];
       setItems(list);
       setTotal(payload.total ?? 0);
       setTotalPages(payload.total_pages ?? 1);
       setSelectedId(list[0]?._id ?? null);
-    } catch (loadError) {
-      const text = loadError instanceof Error ? loadError.message : "Failed to load approval queue.";
-      setError(text);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load approvals.");
     } finally {
       setLoading(false);
     }
   }, [page]);
 
-  useEffect(() => {
-    void loadApprovals();
-  }, [loadApprovals]);
+  useEffect(() => { void load(); }, [load]);
 
-  const selected = items.find((item) => item._id === selectedId) ?? null;
-
-  const columns = [
-    {
-      key: "status",
-      label: "Status",
-      render: (item: ApprovalQueueItem) => (
-        <StatusBadge label={item.is_read ? "reviewed" : "pending"} tone={item.is_read ? "muted" : "warning"} />
-      ),
-    },
-    {
-      key: "message",
-      label: "Approval Item",
-      render: (item: ApprovalQueueItem) => (
-        <button
-          type="button"
-          onClick={() => setSelectedId(item._id ?? null)}
-          className="text-left text-sm text-zinc-900 underline-offset-2 hover:underline"
-        >
-          {item.message}
-        </button>
-      ),
-    },
-    {
-      key: "created",
-      label: "Created",
-      render: (item: ApprovalQueueItem) =>
-        item.created_at ? new Date(item.created_at).toLocaleString() : "-",
-    },
-  ];
+  const selected = items.find((i) => i._id === selectedId) ?? null;
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-5">
       <PageHeader
         title="Approvals Queue"
-        subtitle="Registrar/admin approval workspace. Queue actions are scaffolded while dedicated approval mutation APIs are pending."
-        actions={
-          <button
-            type="button"
-            onClick={() => void loadApprovals()}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100"
-          >
-            Refresh
-          </button>
-        }
+        subtitle="Review and action approval-required items as they arrive."
+        actions={<button type="button" onClick={() => void load()} className="cp-btn-secondary text-xs">Refresh</button>}
       />
 
       <FilterBar>
-        <div className="text-xs text-zinc-600">
-          Source: approval-required notifications (`/api/notifications?type=approval_required`)
-        </div>
-        <div className="ml-auto text-xs text-zinc-500">Total: {total}</div>
+        <span className="text-xs text-zinc-400">Source: approval_required notifications</span>
+        <span className="ml-auto text-xs text-zinc-400">{total} pending</span>
       </FilterBar>
 
-      {loading ? <InlineAlert tone="info" message="Loading approval queue..." /> : null}
-      {error ? <InlineAlert tone="error" message={error} /> : null}
-      {message ? <InlineAlert tone="warning" message={message} /> : null}
+      {loading ? <InlineAlert tone="info"    message="Loading approval queue…" /> : null}
+      {error   ? <InlineAlert tone="error"   message={error} /> : null}
+      {notice  ? <InlineAlert tone="warning" message={notice} /> : null}
 
       {!loading && !error && items.length === 0 ? (
         <EmptyState
-          title="No approval items found"
-          description="Approval-required items will appear here when generated."
+          title="No approval items"
+          description="Approval-required documents and requests will appear here."
         />
       ) : null}
 
       {!loading && !error && items.length > 0 ? (
-        <div className="grid gap-4 lg:grid-cols-[1.25fr_1fr]">
-          <EntityTable columns={columns} rows={items} rowKey={(item) => item._id ?? item.message} />
+        <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+          {/* List */}
+          <div className="cp-card p-0 overflow-hidden">
+            <ul className="divide-y divide-zinc-100">
+              {items.map((item) => {
+                const active = item._id === selectedId;
+                return (
+                  <li key={item._id ?? item.message}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(item._id ?? null)}
+                      className={`w-full flex items-start gap-3 px-4 py-3 text-left transition ${active ? "bg-zinc-50" : "hover:bg-zinc-50/60"}`}
+                    >
+                      <StatusBadge label={item.is_read ? "reviewed" : "pending"} tone={item.is_read ? "muted" : "warning"} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-zinc-900 truncate">{item.message}</p>
+                        <p className="mt-0.5 text-xs text-zinc-400">{item.created_at ? new Date(item.created_at).toLocaleString() : "—"}</p>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
 
-          <div className="rounded-xl border border-zinc-200 bg-white p-4">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-600">Item Details</h3>
+            <div className="flex items-center justify-end gap-2 border-t border-zinc-100 px-4 py-3">
+              <button type="button" disabled={page <= 1}          onClick={() => setPage((p) => p - 1)} className="cp-btn-secondary text-xs disabled:opacity-40">← Prev</button>
+              <span className="text-xs text-zinc-400">{page} / {Math.max(1, totalPages)}</span>
+              <button type="button" disabled={page >= totalPages}  onClick={() => setPage((p) => p + 1)} className="cp-btn-secondary text-xs disabled:opacity-40">Next →</button>
+            </div>
+          </div>
+
+          {/* Detail panel */}
+          <div className="cp-card space-y-4 self-start">
+            <p className="cp-section-title">Item details</p>
             {selected ? (
-              <div className="mt-3 space-y-2 text-sm text-zinc-700">
-                <p>{selected.message}</p>
-                <p>
-                  <span className="font-medium text-zinc-900">Reference ID:</span>{" "}
-                  {selected.reference_id ?? "-"}
-                </p>
-                <p>
-                  <span className="font-medium text-zinc-900">Created:</span>{" "}
-                  {selected.created_at ? new Date(selected.created_at).toLocaleString() : "-"}
-                </p>
-                <div className="pt-1">
-                  <StatusBadge
-                    label={selected.is_read ? "reviewed" : "pending"}
-                    tone={selected.is_read ? "muted" : "warning"}
-                  />
+              <>
+                <p className="text-sm text-zinc-900">{selected.message}</p>
+                <div className="grid gap-2">
+                  <div className="cp-card-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Reference ID</p>
+                    <p className="mt-0.5 text-sm font-mono text-zinc-700">{selected.reference_id ?? "—"}</p>
+                  </div>
+                  <div className="cp-card-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Created</p>
+                    <p className="mt-0.5 text-sm text-zinc-700">{selected.created_at ? new Date(selected.created_at).toLocaleString() : "—"}</p>
+                  </div>
                 </div>
-                <div className="mt-3 flex items-center gap-2">
+                <StatusBadge label={selected.is_read ? "reviewed" : "pending"} tone={selected.is_read ? "muted" : "warning"} />
+                <div className="flex gap-2 pt-1">
                   <button
                     type="button"
-                    onClick={() =>
-                      setMessage(
-                        "Approve action is scaffolded. Connect dedicated approvals mutation API to activate.",
-                      )
-                    }
-                    className="rounded-md border border-emerald-300 px-3 py-1.5 text-sm text-emerald-700 hover:bg-emerald-50"
+                    onClick={() => setNotice("Approve action scaffolded — connect a dedicated approvals mutation API to activate.")}
+                    className="cp-btn flex-1 border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs py-2"
                   >
-                    Approve
+                    ✓ Approve
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      setMessage(
-                        "Reject action is scaffolded. Connect dedicated approvals mutation API to activate.",
-                      )
-                    }
-                    className="rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50"
+                    onClick={() => setNotice("Reject action scaffolded — connect a dedicated approvals mutation API to activate.")}
+                    className="cp-btn flex-1 border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 text-xs py-2"
                   >
-                    Reject
+                    ✕ Reject
                   </button>
                 </div>
-              </div>
+              </>
             ) : (
-              <p className="mt-2 text-sm text-zinc-600">Select an item from the queue to view details.</p>
+              <EmptyState title="No item selected" description="Select an item from the queue." />
             )}
           </div>
-        </div>
-      ) : null}
-
-      {!loading && !error && items.length > 0 ? (
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            disabled={page <= 1}
-            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <span className="text-sm text-zinc-600">
-            Page {page} / {Math.max(1, totalPages)}
-          </span>
-          <button
-            type="button"
-            disabled={page >= totalPages}
-            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Next
-          </button>
         </div>
       ) : null}
     </section>

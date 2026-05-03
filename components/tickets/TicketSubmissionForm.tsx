@@ -3,59 +3,41 @@
 import { FormEvent, useState } from "react";
 
 import InlineAlert from "@/components/ui/InlineAlert";
+import StatusBadge from "@/components/ui/StatusBadge";
 
-const ticketTypes = [
-  "certificate",
-  "transcript",
-  "correction",
-  "permission",
-  "internship",
-  "other",
-] as const;
-const priorities = ["low", "medium", "high", "urgent"] as const;
+const ticketTypes   = ["certificate", "transcript", "correction", "permission", "internship", "other"] as const;
+const priorities    = ["low", "medium", "high", "urgent"] as const;
+
+const priorityStyle: Record<(typeof priorities)[number], string> = {
+  low:    "border-zinc-200  bg-zinc-50   text-zinc-600",
+  medium: "border-sky-200   bg-sky-50    text-sky-700",
+  high:   "border-amber-200 bg-amber-50  text-amber-700",
+  urgent: "border-red-200   bg-red-50    text-red-700",
+};
 
 export default function TicketSubmissionForm() {
-  const [title, setTitle] = useState("");
+  const [title,       setTitle]       = useState("");
   const [description, setDescription] = useState("");
-  const [type, setType] = useState<(typeof ticketTypes)[number]>("certificate");
-  const [priority, setPriority] =
-    useState<(typeof priorities)[number]>("medium");
-  const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<{
-    title?: string;
-    description?: string;
-  }>({});
+  const [type,        setType]        = useState<(typeof ticketTypes)[number]>("certificate");
+  const [priority,    setPriority]    = useState<(typeof priorities)[number]>("medium");
+  const [isLoading,   setIsLoading]   = useState(false);
+  const [message,     setMessage]     = useState<string | null>(null);
+  const [error,       setError]       = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ title?: string; description?: string }>({});
 
-  function validateForm() {
-    const nextErrors: { title?: string; description?: string } = {};
-
-    const trimmedTitle = title.trim();
-    const trimmedDescription = description.trim();
-
-    if (trimmedTitle.length < 3) {
-      nextErrors.title = "Title must be at least 3 characters.";
-    } else if (trimmedTitle.length > 200) {
-      nextErrors.title = "Title must be 200 characters or less.";
-    }
-
-    if (trimmedDescription.length < 10) {
-      nextErrors.description = "Description must be at least 10 characters.";
-    } else if (trimmedDescription.length > 5000) {
-      nextErrors.description = "Description must be 5000 characters or less.";
-    }
-
-    setFieldErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+  function validate() {
+    const fe: typeof fieldErrors = {};
+    if (title.trim().length < 3)         fe.title       = "Title must be at least 3 characters.";
+    if (title.trim().length > 200)       fe.title       = "Title must be 200 characters or less.";
+    if (description.trim().length < 10)  fe.description = "Description must be at least 10 characters.";
+    if (description.trim().length > 5000) fe.description = "Description must be 5000 characters or less.";
+    setFieldErrors(fe);
+    return Object.keys(fe).length === 0;
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!validateForm()) {
-      return;
-    }
-
+    if (!validate()) return;
     setIsLoading(true);
     setError(null);
     setMessage(null);
@@ -64,150 +46,111 @@ export default function TicketSubmissionForm() {
       const response = await fetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim(),
-          type,
-          priority,
-        }),
+        body: JSON.stringify({ title: title.trim(), description: description.trim(), type, priority }),
       });
-
       const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Could not submit ticket.");
-      }
-
-      setTitle("");
-      setDescription("");
-      setType("certificate");
-      setPriority("medium");
-      setFieldErrors({});
-      setMessage("Ticket submitted successfully.");
-    } catch (submitError) {
-      const msg =
-        submitError instanceof Error
-          ? submitError.message
-          : "Ticket submission failed.";
-      setError(msg);
+      if (!response.ok) throw new Error(payload.error ?? "Could not submit ticket.");
+      setTitle(""); setDescription(""); setType("certificate"); setPriority("medium"); setFieldErrors({});
+      setMessage("Ticket submitted successfully. We'll get back to you shortly.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ticket submission failed.");
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="w-full text-zinc-600 max-w-3xl space-y-4 rounded-xl border border-zinc-200 bg-white p-5"
-    >
-      <h2 className="text-xl font-semibold text-zinc-900">Submit Ticket</h2>
-      <p className="text-sm text-zinc-600">
-        Create a new service request for academic document, correction,
-        permission, or related support.
-      </p>
-
-      {message ? <InlineAlert tone="success" message={message} /> : null}
-      {error ? <InlineAlert tone="error" message={error} /> : null}
-
-      <label className="block">
-        <span className="mb-1 block text-sm text-zinc-700">Title</span>
-        <input
-          value={title}
-          onChange={(event) => {
-            setTitle(event.target.value);
-            if (fieldErrors.title) {
-              setFieldErrors((prev) => ({ ...prev, title: undefined }));
-            }
-          }}
-          className={`w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-zinc-500 ${
-            fieldErrors.title ? "border-red-300" : "border-zinc-300"
-          }`}
-          minLength={3}
-          maxLength={200}
-          required
-        />
-        <div className="mt-1 flex items-center justify-between">
-          <p className="text-xs text-zinc-500">Keep it short and specific.</p>
-          <p className="text-xs text-zinc-500">{title.length}/200</p>
-        </div>
-        {fieldErrors.title ? (
-          <p className="mt-1 text-xs text-red-600">{fieldErrors.title}</p>
-        ) : null}
-      </label>
-
-      <label className="block">
-        <span className="mb-1 block text-sm text-zinc-700">Description</span>
-        <textarea
-          value={description}
-          onChange={(event) => {
-            setDescription(event.target.value);
-            if (fieldErrors.description) {
-              setFieldErrors((prev) => ({ ...prev, description: undefined }));
-            }
-          }}
-          className={`min-h-28 w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-zinc-500 ${
-            fieldErrors.description ? "border-red-300" : "border-zinc-300"
-          }`}
-          minLength={10}
-          maxLength={5000}
-          required
-        />
-        <div className="mt-1 flex items-center justify-between">
-          <p className="text-xs text-zinc-500">
-            Include relevant context (IDs, course code, requested outcome, and
-            deadline).
+    <div className="mx-auto max-w-2xl">
+      <form onSubmit={onSubmit} className="cp-card space-y-5">
+        <div className="border-b border-zinc-100 pb-4">
+          <h2 className="text-lg font-bold text-zinc-900">Submit a service request</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            Use this form to request academic documents, corrections, or permissions.
           </p>
-          <p className="text-xs text-zinc-500">{description.length}/5000</p>
         </div>
-        {fieldErrors.description ? (
-          <p className="mt-1 text-xs text-red-600">{fieldErrors.description}</p>
-        ) : null}
-      </label>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <label className="block">
-          <span className="mb-1 block text-sm text-zinc-700">Type</span>
-          <select
-            value={type}
-            onChange={(event) =>
-              setType(event.target.value as (typeof ticketTypes)[number])
-            }
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500"
+        {message ? <InlineAlert tone="success" message={message} /> : null}
+        {error   ? <InlineAlert tone="error"   message={error}   /> : null}
+
+        {/* Title */}
+        <div>
+          <label htmlFor="ticket-title" className="cp-label">Request title</label>
+          <input
+            id="ticket-title"
+            value={title}
+            onChange={(e) => { setTitle(e.target.value); if (fieldErrors.title) setFieldErrors((p) => ({ ...p, title: undefined })); }}
+            placeholder="e.g. Transcript request for visa application"
+            className={`cp-input ${fieldErrors.title ? "border-red-300" : ""}`}
+            minLength={3}
+            maxLength={200}
+            required
+          />
+          <div className="mt-1 flex justify-between text-xs text-zinc-400">
+            {fieldErrors.title ? <span className="text-red-600">{fieldErrors.title}</span> : <span>Keep it short and specific.</span>}
+            <span>{title.length}/200</span>
+          </div>
+        </div>
+
+        {/* Description */}
+        <div>
+          <label htmlFor="ticket-desc" className="cp-label">Description</label>
+          <textarea
+            id="ticket-desc"
+            value={description}
+            onChange={(e) => { setDescription(e.target.value); if (fieldErrors.description) setFieldErrors((p) => ({ ...p, description: undefined })); }}
+            placeholder="Include relevant details: student ID, course code, deadline, expected outcome…"
+            className={`cp-textarea ${fieldErrors.description ? "border-red-300" : ""}`}
+            minLength={10}
+            maxLength={5000}
+            required
+          />
+          <div className="mt-1 flex justify-between text-xs text-zinc-400">
+            {fieldErrors.description ? <span className="text-red-600">{fieldErrors.description}</span> : <span>More context leads to faster resolution.</span>}
+            <span>{description.length}/5000</span>
+          </div>
+        </div>
+
+        {/* Type + Priority */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="ticket-type" className="cp-label">Request type</label>
+            <select id="ticket-type" value={type} onChange={(e) => setType(e.target.value as typeof type)} className="cp-select">
+              {ticketTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="cp-label">Priority</label>
+            <div className="flex flex-wrap gap-1.5">
+              {priorities.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPriority(p)}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium capitalize transition ${
+                    priority === p ? priorityStyle[p] + " ring-2 ring-offset-1 ring-zinc-400" : priorityStyle[p] + " opacity-60 hover:opacity-100"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-zinc-400">
+              Current: <StatusBadge label={priority} />
+            </p>
+          </div>
+        </div>
+
+        <div className="border-t border-zinc-100 pt-4">
+          <button
+            type="submit"
+            disabled={isLoading || title.trim().length < 3 || description.trim().length < 10}
+            className="cp-btn-primary w-full py-2.5"
           >
-            {ticketTypes.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block">
-          <span className="mb-1 block text-sm text-zinc-700">Priority</span>
-          <select
-            value={priority}
-            onChange={(event) =>
-              setPriority(event.target.value as (typeof priorities)[number])
-            }
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500"
-          >
-            {priorities.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <button
-        type="submit"
-        disabled={
-          isLoading || title.trim().length < 3 || description.trim().length < 10
-        }
-        className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {isLoading ? "Submitting..." : "Submit"}
-      </button>
-    </form>
+            {isLoading ? "Submitting…" : "Submit Request"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }

@@ -9,28 +9,30 @@ type ChatInputProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
-export default function ChatInput({
-  value,
-  isLoading,
-  onChange,
-  onSubmit,
-}: ChatInputProps) {
+export default function ChatInput({ value, isLoading, onChange, onSubmit }: ChatInputProps) {
   return (
-    <form onSubmit={onSubmit} className="flex gap-2">
+    <form onSubmit={onSubmit} className="flex items-end gap-2">
       <input
         type="text"
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder="Ask your question..."
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Ask a question about courses, policies, or processes…"
         disabled={isLoading}
-        className="flex-1 rounded-md border text-zinc-900 border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500 disabled:opacity-60"
+        className="cp-input flex-1"
       />
       <button
         type="submit"
         disabled={isLoading || value.trim().length < 2}
-        className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+        className="cp-btn-primary shrink-0 px-4 py-2"
       >
-        {isLoading ? "Sending..." : "Send"}
+        {isLoading ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            <span>Sending</span>
+          </span>
+        ) : (
+          "Send →"
+        )}
       </button>
     </form>
   );

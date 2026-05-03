@@ -19,30 +19,30 @@ export default function EntityTable<T>({
   minWidthClassName = "min-w-[720px]",
 }: EntityTableProps<T>) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+    <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm">
       <table className={`w-full text-left text-sm ${minWidthClassName}`}>
         <thead>
-          <tr className="border-b border-zinc-200 text-zinc-900">
+          <tr className="border-b border-zinc-100 bg-zinc-50/80">
             {columns.map((column) => (
               <th
                 key={column.key}
-                className={`px-3 py-2 ${column.className ?? ""}`}
+                className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500 ${column.className ?? ""}`}
               >
                 {column.label}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-zinc-100">
           {rows.map((row) => (
             <tr
               key={rowKey(row)}
-              className="border-b border-zinc-100 last:border-b-0"
+              className="transition-colors hover:bg-zinc-50"
             >
               {columns.map((column) => (
                 <td
                   key={column.key}
-                  className={`px-3 py-2 align-top ${column.className ?? ""}`}
+                  className={`px-4 py-3 align-top text-zinc-900 ${column.className ?? ""}`}
                 >
                   {column.render(row)}
                 </td>
