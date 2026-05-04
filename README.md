@@ -1,36 +1,112 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CampusPilot AI
+
+CampusPilot AI is a full-stack academic department management assistant. It combines role-based dashboards, AI chat over department knowledge, service request workflows, document generation, scheduling, notices, approvals, reports, and admin tools.
+
+The project is built with Next.js App Router, TypeScript, MongoDB/Mongoose, Auth.js, OpenAI, Cloudinary, TailwindCSS, and Zod.
 
 ## Getting Started
 
-First, run the development server:
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create `.env.local` with the required values:
+
+```bash
+MONGODB_URI=
+NEXTAUTH_SECRET=
+NEXTAUTH_URL=http://localhost:3000
+OPENAI_API_KEY=
+OPENAI_CHAT_MODEL=
+OPENAI_EMBEDDING_MODEL=
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+```
+
+Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run dev      # Start local development server
+npm run build    # Build and type-check production app
+npm run start    # Start production server
+npm run lint     # Run ESLint
+```
 
-## Learn More
+## User Roles
 
-To learn more about Next.js, take a look at the following resources:
+- `student`: AI chat, notices, schedules, ticket submission, ticket tracking, notifications.
+- `faculty`: AI chat, ticket operations, document center, reports, schedules, notices.
+- `admin`: full management access, including users, master data, schedules, notices, approvals, KB upload, reports, and activity logs.
+- `registrar`: approvals, notices, documents, reports, ticket operations, and schedules.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Account creation is admin-only. Student profile records are created automatically when an admin creates a student user.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Implemented Modules
 
-## Deploy on Vercel
+- Authentication and role-based access control.
+- AI chat with knowledge base retrieval and FAQ fallback.
+- Chat-to-ticket routing for students.
+- Knowledge base upload and semantic search.
+- Ticket creation, assignment, status workflow, escalation, and activity logs.
+- AI-assisted document generation with Cloudinary storage.
+- Real approval records and approve/reject workflow.
+- Schedule creation, updates, rescheduling, deletion, conflict checks, and change logs.
+- Department notices with role-filtered reading and audience broadcasts.
+- Master data management for departments, students, faculty, courses, rooms, and lab resources.
+- Notifications, reports, analytics, and admin activity logs.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Important Routes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `/` public landing page
+- `/login` sign in
+- `/dashboard` role-aware dashboard
+- `/chat` AI assistant
+- `/notices` role-filtered notices
+- `/notifications` notification center
+- `/schedules` schedule viewer
+- `/tickets` student ticket tracking
+- `/tickets/new` student ticket submission
+- `/dashboard/tickets` ticket operations
+- `/dashboard/schedules` schedule admin
+- `/dashboard/master-data` master data admin
+- `/dashboard/faqs` FAQ management
+- `/dashboard/kb` knowledge base upload
+- `/dashboard/documents` document center
+- `/dashboard/approvals` approvals queue
+- `/dashboard/notices` notice composer
+- `/dashboard/reports` reports
+- `/dashboard/activity` activity log
+- `/register` admin-only user provisioning
+
+## Project Structure
+
+- `app/`: Next.js pages and API routes.
+- `components/`: reusable UI and feature-specific client components.
+- `services/`: business logic for APIs and workflows.
+- `models/`: Mongoose models.
+- `lib/`: shared clients and configuration.
+- `utils/`: request helpers and shared utilities.
+
+## Documentation
+
+The main project documentation lives outside this app folder:
+
+- `../docs/Main-Req.md`: original requirements.
+- `../docs/API_ROUTES.md`: backend API route registry.
+- `../docs/BACKEND_DOCS.md`: backend architecture and implementation status.
+- `../docs/FRONTEND_DOCS.md`: frontend route map, role navigation, and UI flows.
+- `../docs/MISSING_FEATURES.md`: remaining implementation backlog.
+- `../docs/CURSOR_RULES.md`: development rules and coding standards.
+
+Keep these docs updated whenever routes, workflows, permissions, or major UI behavior changes.
