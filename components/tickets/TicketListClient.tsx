@@ -122,7 +122,7 @@ export default function TicketListClient({ adminMode = false }: { adminMode?: bo
   const displayed         = adminMode && showOverdueOnly ? tickets.filter(isOverdue) : tickets;
 
   const baseColumns = [
-    { key: "title",    label: "Title",    render: (t: TicketItem) => <span className="font-medium text-zinc-900">{t.title}</span> },
+    { key: "title",    label: "Title",    render: (t: TicketItem) => <Link href={`/tickets/${t._id}`} className="font-medium text-zinc-900 underline-offset-4 hover:underline">{t.title}</Link> },
     { key: "type",     label: "Type",     render: (t: TicketItem) => <span className="capitalize text-sm">{t.type}</span> },
     { key: "priority", label: "Priority", render: (t: TicketItem) => <StatusBadge label={t.priority} /> },
     { key: "status",   label: "Status",   render: (t: TicketItem) => <StatusBadge label={t.status} /> },

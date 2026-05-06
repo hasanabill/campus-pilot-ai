@@ -59,12 +59,15 @@ Account creation is admin-only. Student profile records are created automaticall
 - Chat-to-ticket routing for students.
 - Knowledge base upload and semantic search.
 - Ticket creation, assignment, status workflow, escalation, and activity logs.
+- Ticket detail conversation threads.
 - AI-assisted document generation with Cloudinary storage.
+- Document template library and generated-document registry.
 - Real approval records and approve/reject workflow.
 - Schedule creation, updates, rescheduling, deletion, conflict checks, and change logs.
 - Department notices with role-filtered reading and audience broadcasts.
 - Master data management for departments, students, faculty, courses, rooms, and lab resources.
 - Notifications, reports, analytics, and admin activity logs.
+- Workflow task tracking and reminder dispatch.
 
 ## Important Routes
 
@@ -76,6 +79,7 @@ Account creation is admin-only. Student profile records are created automaticall
 - `/notifications` notification center
 - `/schedules` schedule viewer
 - `/tickets` student ticket tracking
+- `/tickets/[id]` ticket conversation thread
 - `/tickets/new` student ticket submission
 - `/dashboard/tickets` ticket operations
 - `/dashboard/schedules` schedule admin
@@ -84,7 +88,9 @@ Account creation is admin-only. Student profile records are created automaticall
 - `/dashboard/kb` knowledge base upload
 - `/dashboard/documents` document center
 - `/dashboard/approvals` approvals queue
+- `/dashboard/workflow` workflow task dashboard
 - `/dashboard/notices` notice composer
+- `/dashboard/notifications` notification broadcast composer
 - `/dashboard/reports` reports
 - `/dashboard/activity` activity log
 - `/register` admin-only user provisioning

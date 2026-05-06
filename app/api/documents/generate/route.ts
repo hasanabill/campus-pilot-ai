@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       format: "pdf",
     });
     const generatedDocument = await GeneratedDocument.create({
-      template_id: null,
+      template_id: result.template_id ? new Types.ObjectId(result.template_id) : null,
       requested_by: new Types.ObjectId(session.user.id),
       related_ticket_id: null,
       ai_prompt_snapshot: JSON.stringify(parsed.data),

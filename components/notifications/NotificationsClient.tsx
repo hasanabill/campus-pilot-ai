@@ -37,6 +37,7 @@ export default function NotificationsClient() {
   const [page,       setPage]       = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total,      setTotal]      = useState(0);
+  const [notice,     setNotice]     = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,6 +62,32 @@ export default function NotificationsClient() {
 
   useEffect(() => { void load(); }, [load]);
 
+  async function markOne(id: string, isRead: boolean) {
+    setNotice(null);
+    const res = await fetch(`/api/notifications/${id}/read`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_read: isRead }),
+    });
+    if (!res.ok) {
+      setError("Failed to update notification read state.");
+      return;
+    }
+    await load();
+  }
+
+  async function markAllRead() {
+    setNotice(null);
+    const res = await fetch("/api/notifications/read-all", { method: "PATCH" });
+    const payload = (await res.json()) as { updated_count?: number; error?: string };
+    if (!res.ok) {
+      setError(payload.error ?? "Failed to mark notifications read.");
+      return;
+    }
+    setNotice(`Marked ${payload.updated_count ?? 0} notifications as read.`);
+    await load();
+  }
+
   const grouped = useMemo(() =>
     items.reduce<Record<string, NotificationItem[]>>((acc, item) => {
       const key = dateLabel(item.created_at ?? item.sent_at ?? null);
@@ -75,9 +102,10 @@ export default function NotificationsClient() {
         title="Notifications"
         subtitle="Updates from tickets, schedules, approvals, and announcements."
         actions={
-          <button type="button" onClick={() => void load()} className="cp-btn-secondary text-xs">
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => void markAllRead()} className="cp-btn-secondary text-xs">Mark all read</button>
+            <button type="button" onClick={() => void load()} className="cp-btn-secondary text-xs">Refresh</button>
+          </div>
         }
       />
 
@@ -96,6 +124,7 @@ export default function NotificationsClient() {
 
       {loading ? <InlineAlert tone="info" message="Loading notifications…" /> : null}
       {error   ? <InlineAlert tone="error" message={error} /> : null}
+      {notice  ? <InlineAlert tone="success" message={notice} /> : null}
 
       {!loading && !error && items.length === 0 ? (
         <EmptyState title="No notifications" description="You are all caught up for the selected filters." />
@@ -120,6 +149,11 @@ export default function NotificationsClient() {
                     <p className="text-sm text-zinc-900">{item.message}</p>
                     <p className="mt-1 text-xs text-zinc-400">{new Date(item.created_at ?? item.sent_at ?? "").toLocaleString()}</p>
                   </div>
+                  {item._id ? (
+                    <button type="button" onClick={() => void markOne(item._id!, !item.is_read)} className="cp-btn-secondary shrink-0 text-xs">
+                      {item.is_read ? "Mark unread" : "Mark read"}
+                    </button>
+                  ) : null}
                 </div>
               ))}
             </div>

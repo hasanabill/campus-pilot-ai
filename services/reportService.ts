@@ -4,6 +4,7 @@ import { connectToDatabase } from "@/lib/mongodb";
 import ChatLog from "@/models/ChatLog";
 import Report from "@/models/Report";
 import Ticket from "@/models/Ticket";
+import { summarizeText } from "@/services/aiService";
 
 const reportTypes = [
   "accreditation",
@@ -143,6 +144,26 @@ function summaryToText(summary: ReportSummary): string {
   ].join("\n");
 }
 
+async function summaryToNarrative(summary: ReportSummary, reportType: (typeof reportTypes)[number]) {
+  const base = summaryToText(summary);
+  const prompt = [
+    `Create a concise ${reportType.replaceAll("_", " ")} report narrative for an academic department.`,
+    "Use the metrics below. Mention service request volume, completion rate, AI usage, and routed queries.",
+    "Keep the tone formal and suitable for audit/accreditation documentation.",
+    base,
+  ].join("\n\n");
+
+  try {
+    return await summarizeText(prompt, { maxWords: 450 });
+  } catch {
+    return [
+      `Report type: ${reportType.replaceAll("_", " ")}`,
+      base,
+      "Narrative summary could not be generated automatically; raw metrics are included for review.",
+    ].join("\n\n");
+  }
+}
+
 export async function generateAndStoreReport(
   requesterId: string,
   input: z.infer<typeof generateReportSchema>,
@@ -152,6 +173,11 @@ export async function generateAndStoreReport(
     period_start: parsed.period_start,
     period_end: parsed.period_end,
   });
+
+  const summaryText =
+    parsed.report_type === "accreditation" || parsed.report_type === "audit"
+      ? await summaryToNarrative(summary, parsed.report_type)
+      : summaryToText(summary);
 
   await connectToDatabase();
   const report = await Report.create({
@@ -164,7 +190,7 @@ export async function generateAndStoreReport(
     period_start: new Date(summary.period.start),
     period_end: new Date(summary.period.end),
     generated_by: requesterId,
-    summary_text: summaryToText(summary),
+    summary_text: summaryText,
   });
 
   return { report: report.toObject(), summary };

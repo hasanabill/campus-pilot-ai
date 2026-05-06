@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { ingestKnowledgeBaseDocument, kbUploadSchema } from "@/services/knowledgeBaseService";
 import { uploadFormFileToCloudinary } from "@/services/storageService";
+import { extractTextFromFile } from "@/services/textExtractionService";
 import { enforceRateLimit, validateFileUpload } from "@/utils/request";
 
 function inferSourceTypeFromFileName(fileName: string): "pdf" | "docx" | "text" {
@@ -62,6 +63,14 @@ export async function POST(request: Request) {
         resource_type: "raw",
       });
 
+      const extractedText = documentText.trim() ? documentText : await extractTextFromFile(file);
+      if (!extractedText.trim()) {
+        return NextResponse.json(
+          { error: "Could not extract text automatically. Paste document_text before ingesting this file." },
+          { status: 400 },
+        );
+      }
+
       const parsed = kbUploadSchema.safeParse({
         title,
         category,
@@ -70,7 +79,7 @@ export async function POST(request: Request) {
         public_id: uploaded.public_id,
         uploaded_by: session.user.id,
         department_id: departmentId,
-        document_text: documentText,
+        document_text: extractedText,
       });
 
       if (!parsed.success) {
@@ -86,6 +95,7 @@ export async function POST(request: Request) {
           message: "Knowledge document uploaded and ingested.",
           cloudinary_url: uploaded.secure_url,
           public_id: uploaded.public_id,
+          extracted_text_preview: extractedText.slice(0, 500),
           ...result,
         },
         { status: 201 },

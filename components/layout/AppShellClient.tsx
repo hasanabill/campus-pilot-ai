@@ -37,7 +37,9 @@ const navItems: NavItem[] = [
   { href: "/dashboard/schedules", label: "Schedule Admin",   icon: "calendarEdit",  section: "mgmt",   roles: ["admin"] },
   { href: "/dashboard/documents", label: "Document Center",  icon: "doc",           section: "mgmt",   roles: ["faculty", "admin", "registrar"] },
   { href: "/dashboard/approvals", label: "Approvals",        icon: "check",         section: "mgmt",   roles: ["admin", "registrar"] },
+  { href: "/dashboard/workflow",  label: "Workflow Tasks",   icon: "activity",      section: "mgmt",   roles: ["faculty", "admin", "registrar"] },
   { href: "/dashboard/notices",   label: "Notice Composer",  icon: "bell",          section: "mgmt",   roles: ["admin", "registrar"] },
+  { href: "/dashboard/notifications", label: "Broadcasts",    icon: "bell",          section: "mgmt",   roles: ["admin", "registrar"] },
   { href: "/dashboard/reports",   label: "Reports",          icon: "chart",         section: "mgmt",   roles: ["faculty", "admin", "registrar"] },
   /* ── Admin ── */
   { href: "/dashboard/master-data", label: "Master Data",     icon: "activity",      section: "admin",  roles: ["admin"] },

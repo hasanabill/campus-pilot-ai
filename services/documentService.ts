@@ -1,6 +1,8 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { z } from "zod";
 
+import { connectToDatabase } from "@/lib/mongodb";
+import DocumentTemplate from "@/models/DocumentTemplate";
 import { generateDocument as generateDocumentText } from "@/services/aiService";
 
 const documentTypes = [
@@ -16,6 +18,7 @@ const tones = ["formal", "neutral"] as const;
 export const generateDocumentSchema = z.object({
   document_type: z.enum(documentTypes),
   title: z.string().min(3).max(200),
+  template_id: z.string().optional().nullable(),
   template_name: z.string().min(2).max(100).optional(),
   tone: z.enum(tones).optional().default("formal"),
   max_words: z.number().int().min(100).max(2000).optional().default(500),
@@ -125,7 +128,31 @@ function safeFileName(value: string): string {
 
 export async function generateDocumentBundle(payload: GenerateDocumentInput) {
   const parsed = generateDocumentSchema.parse(payload);
-  const prompt = toPrompt(parsed);
+  let templateSnapshot: { id: string; name: string; body: string } | null = null;
+
+  if (parsed.template_id) {
+    await connectToDatabase();
+    const template = await DocumentTemplate.findById(parsed.template_id)
+      .select("name template_body is_active")
+      .lean<{ _id: unknown; name: string; template_body: string; is_active: boolean } | null>();
+    if (!template || !template.is_active) {
+      throw new Error("Selected document template was not found or is inactive.");
+    }
+    templateSnapshot = {
+      id: parsed.template_id,
+      name: template.name,
+      body: template.template_body,
+    };
+  }
+
+  const prompt = [
+    templateSnapshot
+      ? `Use this stored template as the primary structure:\n${templateSnapshot.body}`
+      : null,
+    toPrompt({ ...parsed, template_name: parsed.template_name ?? templateSnapshot?.name }),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   const generatedText = await generateDocumentText(prompt, {
     templateName: parsed.template_name,
@@ -139,5 +166,6 @@ export async function generateDocumentBundle(payload: GenerateDocumentInput) {
     generated_text: generatedText,
     pdf_bytes: pdfBytes,
     file_name: `${safeFileName(parsed.title) || "generated-document"}.pdf`,
+    template_id: templateSnapshot?.id ?? null,
   };
 }

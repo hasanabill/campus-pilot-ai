@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import InlineAlert from "@/components/ui/InlineAlert";
 import PageHeader  from "@/components/ui/PageHeader";
@@ -10,11 +10,14 @@ const tones         = ["formal", "neutral"] as const;
 
 type InputRow    = { key: string; value: string };
 type UploadResult = { message?: string; file_name?: string; cloudinary_url?: string; public_id?: string; bytes?: number; error?: string };
+type Template = { _id: string; name: string; type: string; template_body: string; is_active: boolean };
+type GeneratedDocument = { _id: string; status: string; cloudinary_url: string; public_id: string; created_at?: string };
 
 export default function DocumentsCenterClient() {
   /* ── Generate state ── */
   const [documentType,        setDocumentType]        = useState<(typeof documentTypes)[number]>("certificate");
   const [title,               setTitle]               = useState("");
+  const [templateId,          setTemplateId]          = useState("");
   const [templateName,        setTemplateName]        = useState("");
   const [tone,                setTone]                = useState<(typeof tones)[number]>("formal");
   const [maxWords,            setMaxWords]            = useState(500);
@@ -24,6 +27,10 @@ export default function DocumentsCenterClient() {
   const [generateSuccess,     setGenerateSuccess]     = useState<string | null>(null);
   const [generatedCloudinaryUrl, setGeneratedCloudinaryUrl] = useState<string | null>(null);
   const [generatedPublicId,   setGeneratedPublicId]   = useState<string | null>(null);
+  const [templates,           setTemplates]           = useState<Template[]>([]);
+  const [documents,           setDocuments]           = useState<GeneratedDocument[]>([]);
+  const [newTemplateName,     setNewTemplateName]     = useState("");
+  const [newTemplateBody,     setNewTemplateBody]     = useState("");
 
   /* ── Upload state ── */
   const [uploadFile,    setUploadFile]    = useState<File | null>(null);
@@ -42,6 +49,40 @@ export default function DocumentsCenterClient() {
     return out;
   }
 
+  async function loadRecords() {
+    const [templateRes, documentRes] = await Promise.all([
+      fetch("/api/document-templates?is_active=true&limit=50"),
+      fetch("/api/generated-documents?limit=20"),
+    ]);
+    const [templatePayload, documentPayload] = await Promise.all([
+      templateRes.json() as Promise<{ templates?: Template[] }>,
+      documentRes.json() as Promise<{ documents?: GeneratedDocument[] }>,
+    ]);
+    setTemplates(templatePayload.templates ?? []);
+    setDocuments(documentPayload.documents ?? []);
+  }
+
+  useEffect(() => { void loadRecords(); }, []);
+
+  async function createTemplate() {
+    if (!newTemplateName.trim() || !newTemplateBody.trim()) return;
+    const res = await fetch("/api/document-templates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: newTemplateName.trim(),
+        type: documentType,
+        template_body: newTemplateBody.trim(),
+        placeholders: inputRows.map((row) => row.key.trim()).filter(Boolean),
+      }),
+    });
+    if (res.ok) {
+      setNewTemplateName("");
+      setNewTemplateBody("");
+      await loadRecords();
+    }
+  }
+
   async function onGenerate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setGenerateError(null); setGenerateSuccess(null);
@@ -55,7 +96,7 @@ export default function DocumentsCenterClient() {
       const res = await fetch("/api/documents/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ document_type: documentType, title: title.trim(), template_name: templateName.trim() || undefined, tone, max_words: maxWords, inputs: buildInputs() }),
+        body: JSON.stringify({ document_type: documentType, title: title.trim(), template_id: templateId || undefined, template_name: templateName.trim() || undefined, tone, max_words: maxWords, inputs: buildInputs() }),
       });
 
       if (!res.ok) {
@@ -76,6 +117,7 @@ export default function DocumentsCenterClient() {
       setGenerateSuccess(`Downloaded: ${fileName}`);
       setGeneratedCloudinaryUrl(res.headers.get("X-Document-Cloudinary-Url"));
       setGeneratedPublicId(res.headers.get("X-Document-Public-Id"));
+      await loadRecords();
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : "Document generation failed.");
     } finally {
@@ -134,7 +176,16 @@ export default function DocumentsCenterClient() {
             <input id="doc-title" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Completion Certificate – Jane Smith" className="cp-input" />
           </div>
           <div>
-            <label htmlFor="doc-template" className="cp-label">Template name <span className="font-normal text-zinc-400">(optional)</span></label>
+            <label htmlFor="doc-template-id" className="cp-label">Stored template <span className="font-normal text-zinc-400">(optional)</span></label>
+            <select id="doc-template-id" value={templateId} onChange={(e) => setTemplateId(e.target.value)} className="cp-select">
+              <option value="">No stored template</option>
+              {templates.filter((template) => template.type === documentType).map((template) => (
+                <option key={template._id} value={template._id}>{template.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="doc-template" className="cp-label">Template name hint <span className="font-normal text-zinc-400">(optional)</span></label>
             <input id="doc-template" value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="default" className="cp-input" />
           </div>
           <div>
@@ -183,6 +234,42 @@ export default function DocumentsCenterClient() {
           </div>
         ) : null}
       </form>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="cp-card space-y-4">
+          <div>
+            <h2 className="text-base font-bold text-zinc-900">Template library</h2>
+            <p className="mt-0.5 text-xs text-zinc-500">Create reusable templates for AI document generation.</p>
+          </div>
+          <input value={newTemplateName} onChange={(e) => setNewTemplateName(e.target.value)} placeholder="Template name" className="cp-input" />
+          <textarea value={newTemplateBody} onChange={(e) => setNewTemplateBody(e.target.value)} placeholder="Template body with placeholders..." className="cp-textarea min-h-28" />
+          <button type="button" onClick={() => void createTemplate()} className="cp-btn-primary w-full">Save Template</button>
+          <div className="space-y-2">
+            {templates.map((template) => (
+              <div key={template._id} className="cp-card-2">
+                <p className="font-medium text-zinc-900">{template.name}</p>
+                <p className="text-xs text-zinc-500">{template.type.replaceAll("_", " ")}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="cp-card space-y-4">
+          <div>
+            <h2 className="text-base font-bold text-zinc-900">Generated document registry</h2>
+            <p className="mt-0.5 text-xs text-zinc-500">Recently generated records and approval statuses.</p>
+          </div>
+          <div className="space-y-2">
+            {documents.map((document) => (
+              <div key={document._id} className="cp-card-2 text-xs">
+                <p className="font-mono text-zinc-700">{document._id}</p>
+                <p className="mt-1 text-zinc-900">Status: {document.status}</p>
+                <a href={document.cloudinary_url} target="_blank" rel="noreferrer" className="mt-1 block text-sky-700 underline">Open file</a>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* ── Upload form ── */}
       <form onSubmit={onUpload} className="cp-card space-y-5">

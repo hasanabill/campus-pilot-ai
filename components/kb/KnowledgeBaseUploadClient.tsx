@@ -30,6 +30,7 @@ export default function KnowledgeBaseUploadClient({
   const [documentText, setDocumentText] = useState("");
   const [file,         setFile]         = useState<File | null>(null);
   const [loading,      setLoading]      = useState(false);
+  const [extracting,   setExtracting]   = useState(false);
   const [error,        setError]        = useState<string | null>(null);
   const [result,       setResult]       = useState<UploadResult | null>(null);
 
@@ -43,7 +44,6 @@ export default function KnowledgeBaseUploadClient({
     setError(null); setResult(null);
 
     if (!file)                        { setError("Please select a file."); return; }
-    if (documentText.trim().length < 20) { setError("Document text must be at least 20 characters."); return; }
     if (!departmentId.trim())         { setError("Department ID is required."); return; }
 
     setLoading(true);
@@ -61,6 +61,25 @@ export default function KnowledgeBaseUploadClient({
       setError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function extractPreview() {
+    setError(null);
+    if (!file) { setError("Select a file before extracting text."); return; }
+    setExtracting(true);
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const res = await fetch("/api/text-extraction", { method: "POST", body: form });
+      const payload = (await res.json()) as { text?: string; warning?: string; error?: string };
+      if (!res.ok) throw new Error(payload.error ?? "Extraction failed.");
+      if (payload.warning) setError(payload.warning);
+      setDocumentText(payload.text ?? "");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Extraction failed.");
+    } finally {
+      setExtracting(false);
     }
   }
 
@@ -107,12 +126,15 @@ export default function KnowledgeBaseUploadClient({
             className="cp-input cursor-pointer"
           />
           <p className="mt-1 text-xs text-zinc-400">Supported: PDF, DOCX, TXT · Max 10 MB</p>
+          <button type="button" onClick={() => void extractPreview()} disabled={!file || extracting} className="cp-btn-secondary mt-2 text-xs disabled:opacity-40">
+            {extracting ? "Extracting..." : "Preview Extracted Text"}
+          </button>
         </div>
 
         <div>
-          <label htmlFor="kb-text" className="cp-label">Extracted / manual document text <span className="font-normal text-zinc-400">(required for ingestion)</span></label>
+          <label htmlFor="kb-text" className="cp-label">Extracted / manual document text <span className="font-normal text-zinc-400">(auto-filled when possible)</span></label>
           <textarea
-            id="kb-text" required minLength={20}
+            id="kb-text"
             value={documentText} onChange={(e) => setDocumentText(e.target.value)}
             className="cp-textarea"
             placeholder="Paste the full text content of the document here…"

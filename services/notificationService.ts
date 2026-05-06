@@ -32,6 +32,18 @@ export const listNotificationsQuerySchema = z.object({
   page: z.number().int().min(1).optional(),
 });
 
+export const updateNotificationReadSchema = z.object({
+  is_read: z.boolean(),
+});
+
+export const broadcastNotificationSchema = z.object({
+  audience: z.enum(["students", "faculty", "all"]),
+  type: z.enum(["announcement", "reminder"]).optional().default("announcement"),
+  message: z.string().min(1).max(500),
+  reference_type: z.string().optional().nullable(),
+  reference_id: z.string().optional().nullable(),
+});
+
 function objectIdOrNull(value?: string | null): Types.ObjectId | null {
   if (!value) return null;
   if (!Types.ObjectId.isValid(value)) return null;
@@ -97,6 +109,53 @@ export async function listNotificationsForUser(
     limit,
     total_pages: Math.ceil(total / limit),
   };
+}
+
+export async function updateNotificationReadState(userId: string, notificationId: string, isRead: boolean) {
+  await connectToDatabase();
+  const userObjectId = objectIdOrNull(userId);
+  const notificationObjectId = objectIdOrNull(notificationId);
+  if (!userObjectId || !notificationObjectId) throw new Error("Invalid notification id.");
+  return Notification.findOneAndUpdate(
+    { _id: notificationObjectId, user_id: userObjectId },
+    { is_read: isRead },
+    { new: true },
+  ).lean();
+}
+
+export async function markAllNotificationsRead(userId: string) {
+  await connectToDatabase();
+  const userObjectId = objectIdOrNull(userId);
+  if (!userObjectId) throw new Error("Invalid user id.");
+  const result = await Notification.updateMany({ user_id: userObjectId, is_read: false }, { is_read: true });
+  return { updated_count: result.modifiedCount };
+}
+
+function broadcastRoles(audience: "students" | "faculty" | "all") {
+  if (audience === "students") return ["student"];
+  if (audience === "faculty") return ["faculty"];
+  return ["student", "faculty", "admin", "registrar"];
+}
+
+export async function broadcastNotification(payload: z.infer<typeof broadcastNotificationSchema>) {
+  const parsed = broadcastNotificationSchema.parse(payload);
+  await connectToDatabase();
+  const users = await User.find({ role: { $in: broadcastRoles(parsed.audience) }, is_active: true })
+    .select("_id")
+    .lean<Array<{ _id: Types.ObjectId }>>();
+  const created = [];
+  for (const user of users) {
+    created.push(
+      await createNotification({
+        user_id: String(user._id),
+        type: parsed.type,
+        message: parsed.message,
+        reference_type: parsed.reference_type ?? "manual_broadcast",
+        reference_id: parsed.reference_id ?? null,
+      }),
+    );
+  }
+  return { created_count: created.length };
 }
 
 export async function notifyTicketUpdate(params: {
