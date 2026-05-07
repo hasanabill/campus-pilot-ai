@@ -105,6 +105,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = kbUploadSchema.safeParse({
       ...body,
+      source_type: body.source_type ?? "text",
+      cloudinary_url: body.cloudinary_url ?? null,
+      public_id: body.public_id ?? null,
       uploaded_by: session.user.id,
       department_id: body.department_id ?? session.user.department_id,
     });

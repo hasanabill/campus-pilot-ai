@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { z } from "zod";
 
 import { connectToDatabase } from "@/lib/mongodb";
+import Department from "@/models/Department";
 import DepartmentNotice from "@/models/DepartmentNotice";
 import User from "@/models/User";
 import { createNotification } from "@/services/notificationService";
@@ -30,6 +31,34 @@ function requireObjectId(id: string, field: string): Types.ObjectId {
   return new Types.ObjectId(id);
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function resolveDepartmentId(value: string): Promise<Types.ObjectId> {
+  const trimmed = value.trim();
+  if (Types.ObjectId.isValid(trimmed)) {
+    return new Types.ObjectId(trimmed);
+  }
+
+  const department = await Department.findOne({
+    $or: [
+      { code: trimmed.toUpperCase() },
+      { name: { $regex: `\\b${escapeRegExp(trimmed)}\\b`, $options: "i" } },
+    ],
+  })
+    .select("_id")
+    .lean<{ _id: Types.ObjectId } | null>();
+
+  if (!department) {
+    throw new Error(
+      `Department "${value}" was not found. Use a department code from master data, such as CIS/CSE/EEE/10, or a MongoDB _id.`,
+    );
+  }
+
+  return department._id;
+}
+
 function canManageNotices(role: AppRole): boolean {
   return role === "admin" || role === "registrar";
 }
@@ -50,12 +79,13 @@ export async function createNotice(
 
   const parsed = createNoticeSchema.parse(payload);
   await connectToDatabase();
+  const departmentId = await resolveDepartmentId(parsed.department_id);
 
   const notice = await DepartmentNotice.create({
     title: parsed.title,
     body: parsed.body,
     audience: parsed.audience,
-    department_id: requireObjectId(parsed.department_id, "department_id"),
+    department_id: departmentId,
     published_by: requireObjectId(requester.userId, "user id"),
     published_at: new Date(),
     expires_at: parsed.expires_at ? new Date(parsed.expires_at) : null,

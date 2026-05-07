@@ -10,6 +10,7 @@ type Message = { role: "user" | "assistant"; content: string };
 type ChatApiResponse = {
   answer: string;
   session_id: string;
+  context?: Array<{ chunkId: string; score: number }>;
   routed_to_ticket_id?: string | null;
   source?: "faq" | "knowledge_base";
 };
@@ -61,6 +62,13 @@ export default function ChatClient({ userName }: ChatClientProps) {
       setMessages((prev) => [...prev, { role: "assistant", content: payload.answer }]);
       if (payload.source === "faq") {
         setNotice("Answered from the managed FAQ library.");
+      } else if (payload.source === "knowledge_base") {
+        const count = payload.context?.length ?? 0;
+        setNotice(
+          count > 0
+            ? `Retrieved ${count} knowledge base chunk${count === 1 ? "" : "s"} for this answer.`
+            : "No knowledge base chunks matched this question. Try adding more specific KB content or checking the student's department.",
+        );
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Chat request failed.";

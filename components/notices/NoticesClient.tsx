@@ -86,8 +86,18 @@ export default function NoticesClient({ defaultDepartmentId }: { defaultDepartme
           </select>
         </div>
         <div>
-          <label className="cp-label" htmlFor="notice-dept">Department ID</label>
-          <input id="notice-dept" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="cp-input" required />
+          <label className="cp-label" htmlFor="notice-dept">Department code or ID</label>
+          <input
+            id="notice-dept"
+            value={departmentId}
+            onChange={(e) => setDepartmentId(e.target.value)}
+            className="cp-input"
+            placeholder="CIS, CSE, EEE, 10, or MongoDB _id"
+            required
+          />
+          <p className="mt-1 text-xs text-zinc-500">
+            Use the department code from master data. The backend resolves it automatically.
+          </p>
         </div>
         <div className="md:col-span-2">
           <label className="cp-label" htmlFor="notice-body">Notice body</label>

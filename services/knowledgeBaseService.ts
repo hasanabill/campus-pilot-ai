@@ -1,6 +1,8 @@
 import { z } from "zod";
+import { Types } from "mongoose";
 
 import { connectToDatabase } from "@/lib/mongodb";
+import Department from "@/models/Department";
 import KnowledgeBaseChunk from "@/models/KnowledgeBaseChunk";
 import KnowledgeBaseDocument from "@/models/KnowledgeBaseDocument";
 import { generateEmbedding, searchKnowledgeBase } from "@/services/aiService";
@@ -20,8 +22,8 @@ export const kbUploadSchema = z.object({
   title: z.string().min(2).max(200),
   category: z.enum(KB_CATEGORIES),
   source_type: z.enum(KB_SOURCE_TYPES),
-  cloudinary_url: z.url().max(2000),
-  public_id: z.string().min(1).max(300),
+  cloudinary_url: z.url().max(2000).optional().nullable(),
+  public_id: z.string().min(1).max(300).optional().nullable(),
   uploaded_by: z.string().min(1),
   department_id: z.string().min(1),
   document_text: z.string().min(20),
@@ -45,6 +47,10 @@ function normalizeText(text: string): string {
 
 function estimateTokenCount(text: string): number {
   return Math.max(1, Math.round(text.length / 4));
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export function splitTextIntoChunks(text: string): string[] {
@@ -81,9 +87,35 @@ async function embedChunks(chunks: string[]): Promise<number[][]> {
   return embeddings;
 }
 
+async function resolveDepartment(value: string): Promise<{ _id: Types.ObjectId; code?: string }> {
+  const trimmed = value.trim();
+  if (Types.ObjectId.isValid(trimmed)) {
+    return { _id: new Types.ObjectId(trimmed) };
+  }
+
+  const department = await Department.findOne({
+    $or: [
+      { code: trimmed.toUpperCase() },
+      { name: { $regex: `\\b${escapeRegExp(trimmed)}\\b`, $options: "i" } },
+    ],
+  })
+    .select("_id code")
+    .lean<{ _id: Types.ObjectId; code?: string } | null>();
+
+  if (!department) {
+    throw new Error(
+      `Department "${value}" was not found. Use the department code from master data, such as CIS/CSE/EEE, or a MongoDB _id.`,
+    );
+  }
+
+  return department;
+}
+
 export async function ingestKnowledgeBaseDocument(input: KbUploadInput) {
   const parsed = kbUploadSchema.parse(input);
   await connectToDatabase();
+  const department = await resolveDepartment(parsed.department_id);
+  const departmentId = department._id;
 
   const chunks = splitTextIntoChunks(parsed.document_text);
   if (chunks.length === 0) {
@@ -97,7 +129,7 @@ export async function ingestKnowledgeBaseDocument(input: KbUploadInput) {
     cloudinary_url: parsed.cloudinary_url,
     public_id: parsed.public_id,
     uploaded_by: parsed.uploaded_by,
-    department_id: parsed.department_id,
+    department_id: departmentId,
   });
 
   const embeddings = await embedChunks(chunks);
@@ -110,7 +142,9 @@ export async function ingestKnowledgeBaseDocument(input: KbUploadInput) {
       embedding: embeddings[index],
       token_count: estimateTokenCount(chunk),
       metadata: {
-        department_id: parsed.department_id,
+        department_id: String(departmentId),
+        department_code_or_id: parsed.department_id,
+        department_code: department.code ?? parsed.department_id,
         category: parsed.category,
         title: parsed.title,
         source_type: parsed.source_type,

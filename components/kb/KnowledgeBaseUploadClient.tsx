@@ -43,13 +43,34 @@ export default function KnowledgeBaseUploadClient({
     event.preventDefault();
     setError(null); setResult(null);
 
-    if (!file)                        { setError("Please select a file."); return; }
+    const isTextSource = sourceType === "text";
+    if (!isTextSource && !file)       { setError("Please select a file for PDF/DOCX sources."); return; }
+    if (documentText.trim().length < 20) { setError("Document text must be at least 20 characters."); return; }
     if (!departmentId.trim())         { setError("Department ID is required."); return; }
 
     setLoading(true);
     try {
+      if (isTextSource && !file) {
+        const res = await fetch("/api/kb/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: title.trim(),
+            category,
+            source_type: "text",
+            department_id: departmentId.trim(),
+            document_text: documentText.trim(),
+          }),
+        });
+        const payload = (await res.json()) as UploadResult;
+        if (!res.ok) throw new Error(payload.error ?? "Text ingestion failed.");
+        setResult(payload); reset();
+        return;
+      }
+
       const form = new FormData();
-      form.set("file", file); form.set("title", title.trim());
+      if (file) form.set("file", file);
+      form.set("title", title.trim());
       form.set("category", category); form.set("source_type", sourceType);
       form.set("department_id", departmentId.trim()); form.set("document_text", documentText.trim());
 
@@ -100,8 +121,9 @@ export default function KnowledgeBaseUploadClient({
             <input id="kb-title" required value={title} onChange={(e) => setTitle(e.target.value)} className="cp-input" placeholder="Course Handbook 2024" />
           </div>
           <div>
-            <label htmlFor="kb-dept" className="cp-label">Department ID</label>
-            <input id="kb-dept" required value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="cp-input" placeholder="dept_xxxxx" />
+            <label htmlFor="kb-dept" className="cp-label">Department code or ID</label>
+            <input id="kb-dept" required value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="cp-input" placeholder="CIS, CSE, EEE, or MongoDB _id" />
+            <p className="mt-1 text-xs text-zinc-400">Use the department code from master data. The backend resolves it to the internal database ID.</p>
           </div>
           <div>
             <label htmlFor="kb-cat" className="cp-label">Category</label>
@@ -120,12 +142,14 @@ export default function KnowledgeBaseUploadClient({
         <div>
           <label htmlFor="kb-file" className="cp-label">File</label>
           <input
-            id="kb-file" type="file" required
+            id="kb-file" type="file" required={sourceType !== "text"}
             accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             className="cp-input cursor-pointer"
           />
-          <p className="mt-1 text-xs text-zinc-400">Supported: PDF, DOCX, TXT · Max 10 MB</p>
+          <p className="mt-1 text-xs text-zinc-400">
+            {sourceType === "text" ? "Optional for text sources. Paste text below to ingest without a file." : "Required for PDF/DOCX sources · Max 10 MB"}
+          </p>
           <button type="button" onClick={() => void extractPreview()} disabled={!file || extracting} className="cp-btn-secondary mt-2 text-xs disabled:opacity-40">
             {extracting ? "Extracting..." : "Preview Extracted Text"}
           </button>
