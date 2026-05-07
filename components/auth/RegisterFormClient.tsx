@@ -158,15 +158,15 @@ export default function RegisterFormClient() {
           </p>
         </div>
 
-        {/* Department ID */}
+        {/* Department code or ID */}
         <div>
-          <label htmlFor="reg-dept" className="cp-label">Department ID <span className="font-normal text-zinc-400">(optional)</span></label>
+          <label htmlFor="reg-dept" className="cp-label">Department code or ID <span className="font-normal text-zinc-400">(optional)</span></label>
           <input
             id="reg-dept"
             type="text"
             value={departmentId}
             onChange={(e) => setDepartmentId(e.target.value)}
-            placeholder="Leave blank if not applicable"
+            placeholder="CIS, CSE, EEE, 10, or leave blank"
             className="cp-input"
           />
         </div>

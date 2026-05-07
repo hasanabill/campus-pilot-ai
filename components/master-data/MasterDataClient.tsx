@@ -90,7 +90,10 @@ export default function MasterDataClient() {
               {resources.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
           </div>
-          <p className="text-xs text-zinc-500">Fields: {fieldHint}</p>
+          <p className="text-xs text-zinc-500">
+            Fields: {fieldHint}
+            {resource === "courses" ? " (department_id accepts department code or MongoDB _id)." : ""}
+          </p>
           <div>
             <label className="cp-label" htmlFor="record-json">Record JSON</label>
             <textarea id="record-json" value={json} onChange={(e) => setJson(e.target.value)} className="cp-textarea min-h-72 font-mono text-xs" />

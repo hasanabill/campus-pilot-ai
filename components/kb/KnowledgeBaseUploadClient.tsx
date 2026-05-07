@@ -46,7 +46,7 @@ export default function KnowledgeBaseUploadClient({
     const isTextSource = sourceType === "text";
     if (!isTextSource && !file)       { setError("Please select a file for PDF/DOCX sources."); return; }
     if (documentText.trim().length < 20) { setError("Document text must be at least 20 characters."); return; }
-    if (!departmentId.trim())         { setError("Department ID is required."); return; }
+    if (!departmentId.trim())         { setError("Department code or ID is required."); return; }
 
     setLoading(true);
     try {

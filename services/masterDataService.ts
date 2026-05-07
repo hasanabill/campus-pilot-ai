@@ -47,7 +47,7 @@ const createSchemas = {
   courses: z.object({
     name: z.string().min(2).max(200),
     code: z.string().min(2).max(30),
-    department_id: objectIdString,
+    department_id: z.string().min(1),
     credits: z.number().min(0),
     prerequisites: z.array(z.string()).optional().default([]),
     syllabus_url: z.url().optional().nullable(),
@@ -81,11 +81,44 @@ function canManageMasterData(role: AppRole): boolean {
   return role === "admin";
 }
 
-function toObjectIds(resource: Resource, payload: Record<string, unknown>) {
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function resolveDepartmentId(value: string): Promise<Types.ObjectId> {
+  const trimmed = value.trim();
+  if (Types.ObjectId.isValid(trimmed)) {
+    return new Types.ObjectId(trimmed);
+  }
+
+  const department = await Department.findOne({
+    $or: [
+      { code: trimmed.toUpperCase() },
+      { name: { $regex: `\\b${escapeRegExp(trimmed)}\\b`, $options: "i" } },
+    ],
+  })
+    .select("_id")
+    .lean<{ _id: Types.ObjectId } | null>();
+
+  if (!department) {
+    throw new Error(
+      `Department "${value}" was not found. Use a department code from master data, such as CIS/CSE/EEE/10, or a MongoDB _id.`,
+    );
+  }
+
+  return department._id;
+}
+
+async function toObjectIds(resource: Resource, payload: Record<string, unknown>) {
   const next = { ...payload };
-  for (const key of ["user_id", "department_id", "lab_room_id"]) {
+  for (const key of ["user_id", "lab_room_id"]) {
     if (typeof next[key] === "string") next[key] = new Types.ObjectId(next[key] as string);
   }
+
+  if (resource === "courses" && typeof next.department_id === "string") {
+    next.department_id = await resolveDepartmentId(next.department_id);
+  }
+
   return next;
 }
 
@@ -116,7 +149,8 @@ export async function createMasterData(
   resourceSchema.parse(resource);
   const parsed = createSchemas[resource].parse(payload) as Record<string, unknown>;
   await connectToDatabase();
-  const item = await modelMap[resource].create(toObjectIds(resource, parsed));
+  const normalized = await toObjectIds(resource, parsed);
+  const item = await modelMap[resource].create(normalized);
   return item.toObject();
 }
 
@@ -131,8 +165,9 @@ export async function updateMasterData(
   if (!Types.ObjectId.isValid(id)) throw new Error("Invalid item id.");
   const parsed = createSchemas[resource].partial().parse(payload) as Record<string, unknown>;
   await connectToDatabase();
+  const normalized = await toObjectIds(resource, parsed);
   return modelMap[resource]
-    .findByIdAndUpdate(id, toObjectIds(resource, parsed), { new: true, runValidators: true })
+    .findByIdAndUpdate(id, normalized, { new: true, runValidators: true })
     .lean();
 }
 
