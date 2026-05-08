@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import {
   createMasterData,
+  createMasterDataMany,
   listMasterData,
   listMasterDataQuerySchema,
   resourceSchema,
@@ -59,6 +60,11 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const body = await request.json();
+    if (Array.isArray(body)) {
+      const items = await createMasterDataMany({ role: session.user.role }, parsedResource.data, body);
+      return NextResponse.json({ items }, { status: 201 });
+    }
+
     const item = await createMasterData({ role: session.user.role }, parsedResource.data, body);
     return NextResponse.json({ item }, { status: 201 });
   } catch (error) {

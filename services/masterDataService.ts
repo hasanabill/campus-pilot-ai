@@ -154,6 +154,24 @@ export async function createMasterData(
   return item.toObject();
 }
 
+export async function createMasterDataMany(
+  requester: { role: AppRole },
+  resource: Resource,
+  payload: unknown,
+) {
+  if (!canManageMasterData(requester.role)) throw new Error("Only admin can manage master data.");
+  resourceSchema.parse(resource);
+  if (!Array.isArray(payload)) {
+    throw new Error("Invalid input: expected array.");
+  }
+
+  const parsedItems = payload.map((item) => createSchemas[resource].parse(item) as Record<string, unknown>);
+  await connectToDatabase();
+  const normalizedItems = await Promise.all(parsedItems.map((item) => toObjectIds(resource, item)));
+  const created = await modelMap[resource].insertMany(normalizedItems, { ordered: true });
+  return created.map((doc) => (typeof doc.toObject === "function" ? doc.toObject() : doc));
+}
+
 export async function updateMasterData(
   requester: { role: AppRole },
   resource: Resource,

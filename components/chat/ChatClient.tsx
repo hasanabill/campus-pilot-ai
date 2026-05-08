@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import ChatInput from "@/components/chat/ChatInput";
 import ChatMessageList from "@/components/chat/ChatMessageList";
@@ -13,6 +13,10 @@ type ChatApiResponse = {
   context?: Array<{ chunkId: string; score: number }>;
   routed_to_ticket_id?: string | null;
   source?: "faq" | "knowledge_base";
+};
+type ChatSessionResponse = {
+  session_id: string;
+  messages: Message[];
 };
 type ChatClientProps = { userName?: string | null };
 
@@ -33,6 +37,22 @@ export default function ChatClient({ userName }: ChatClientProps) {
   const [lastFailedQuestion, setLastFailedQuestion] = useState<string | null>(null);
 
   const history = useMemo(() => messages.slice(-10), [messages]);
+
+  const loadSession = useCallback(async () => {
+    try {
+      const res = await fetch("/api/chat", { method: "GET" });
+      const payload = (await res.json()) as ChatSessionResponse | { error?: string };
+      if (!res.ok || !("session_id" in payload)) return;
+      setSessionId(payload.session_id);
+      setMessages(payload.messages ?? []);
+    } catch {
+      // Non-blocking: user can still start a new message.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSession();
+  }, [loadSession]);
 
   async function submitQuestion(raw: string) {
     const trimmed = raw.trim();
@@ -144,7 +164,18 @@ export default function ChatClient({ userName }: ChatClientProps) {
           </button>
           <button
             type="button"
-            onClick={() => { setMessages([]); setSessionId(undefined); setError(null); setNotice(null); }}
+            onClick={() => {
+              void (async () => {
+                try {
+                  await fetch("/api/chat", { method: "DELETE" });
+                } finally {
+                  setMessages([]);
+                  setSessionId(undefined);
+                  setError(null);
+                  setNotice(null);
+                }
+              })();
+            }}
             className="cp-btn-secondary text-xs"
           >
             Clear chat

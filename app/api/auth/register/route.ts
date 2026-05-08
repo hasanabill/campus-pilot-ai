@@ -40,7 +40,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ user }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Registration failed.";
-    const status = message.includes("already exists") ? 409 : 500;
+    const status =
+      message.includes("already exists") || message.includes("E11000") || message.includes("duplicate key")
+        ? 409
+        : 500;
 
     return NextResponse.json({ error: message }, { status });
   }

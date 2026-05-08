@@ -141,6 +141,7 @@ export default async function DashboardPage() {
             ["Name",       sessionUser.name ?? "-"],
             ["Email",      sessionUser.email ?? "-"],
             ["Role",       sessionUser.role ?? "-"],
+            ["User ID",    sessionUser.public_user_id ?? "-"],
             ["Department", sessionUser.department_id ?? "N/A"],
           ].map(([k, v]) => (
             <div key={k} className="cp-card-2">

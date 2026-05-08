@@ -88,7 +88,6 @@ Account creation is admin-only. Student profile records are created automaticall
 - `/dashboard/kb` knowledge base upload
 - `/dashboard/documents` document center
 - `/dashboard/approvals` approvals queue
-- `/dashboard/workflow` workflow task dashboard
 - `/dashboard/notices` notice composer
 - `/dashboard/notifications` notification broadcast composer
 - `/dashboard/reports` reports

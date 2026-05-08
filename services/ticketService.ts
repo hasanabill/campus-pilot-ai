@@ -6,6 +6,7 @@ import Student from "@/models/Student";
 import Ticket from "@/models/Ticket";
 import TicketActivityLog from "@/models/TicketActivityLog";
 import { notifyTicketUpdate } from "@/services/notificationService";
+import { mapObjectIdsToPublicUserIds, resolveUserObjectId } from "@/services/userIdentityService";
 
 const ticketTypes = ["certificate", "transcript", "correction", "permission", "internship", "other"] as const;
 const ticketPriorities = ["low", "medium", "high", "urgent"] as const;
@@ -167,8 +168,19 @@ export async function listTickets(requester: Requester, query: z.infer<typeof li
     Ticket.countDocuments(filter),
   ]);
 
+  const assigneeMap = await mapObjectIdsToPublicUserIds(
+    tickets
+      .map((ticket) => (ticket.assigned_to ? String(ticket.assigned_to) : null))
+      .filter((value): value is string => Boolean(value)),
+  );
+
+  const normalizedTickets = tickets.map((ticket) => ({
+    ...ticket,
+    assigned_to: ticket.assigned_to ? assigneeMap[String(ticket.assigned_to)] ?? String(ticket.assigned_to) : null,
+  }));
+
   return {
-    tickets,
+    tickets: normalizedTickets,
     total,
     page,
     limit,
@@ -239,9 +251,7 @@ export async function updateTicket(
   if (parsed.priority !== undefined) existing.priority = parsed.priority;
   if (parsed.escalation_level !== undefined) existing.escalation_level = parsed.escalation_level;
   if (parsed.assigned_to !== undefined) {
-    existing.assigned_to = parsed.assigned_to
-      ? requireObjectId(parsed.assigned_to, "assigned_to")
-      : null;
+    existing.assigned_to = parsed.assigned_to ? await resolveUserObjectId(parsed.assigned_to, "assigned_to") : null;
     action = "assigned";
   }
   if (parsed.due_date !== undefined) {

@@ -28,6 +28,7 @@ const authConfig = {
           name: user.name,
           email: user.email,
           role: user.role,
+          public_user_id: user.public_user_id,
           department_id: user.department_id,
         };
       },
@@ -38,6 +39,7 @@ const authConfig = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.public_user_id = user.public_user_id;
         token.department_id = user.department_id;
       }
       return token;
@@ -50,6 +52,7 @@ const authConfig = {
           | "faculty"
           | "admin"
           | "registrar";
+        session.user.public_user_id = (token.public_user_id as string | null) ?? null;
         session.user.department_id = (token.department_id as string | null) ?? null;
       }
       return session;

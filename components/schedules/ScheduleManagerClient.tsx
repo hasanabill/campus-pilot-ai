@@ -9,6 +9,9 @@ import StatusBadge from "@/components/ui/StatusBadge";
 type Schedule = {
   _id: string;
   schedule_type: string;
+  course?: { name: string; code: string } | null;
+  faculty?: { employee_id: string; designation: string; name: string } | null;
+  room?: { room_code: string; building: string } | null;
   day: string;
   date?: string | null;
   start_time: string;
@@ -95,6 +98,13 @@ export default function ScheduleManagerClient() {
                 <p className="font-semibold text-zinc-900">{item.schedule_type} · {item.day}</p>
                 <StatusBadge label={item.status} tone={item.status === "cancelled" ? "danger" : "info"} />
               </div>
+              <p className="mt-1 text-sm text-zinc-700">
+                {item.course ? `${item.course.code} - ${item.course.name}` : "—"}
+                {" · "}
+                {item.room ? `${item.room.room_code} - ${item.room.building}` : "—"}
+                {" · "}
+                {item.faculty ? `${item.faculty.name} (${item.faculty.employee_id})` : "—"}
+              </p>
               <p className="mt-1 text-sm text-zinc-700">{item.start_time} - {item.end_time} · {item.semester} · Section {item.section}</p>
               <p className="mt-1 font-mono text-xs text-zinc-500">{item._id}</p>
             </div>

@@ -28,6 +28,10 @@ export default function RegisterFormClient() {
   const [email,        setEmail]        = useState("");
   const [password,     setPassword]     = useState("");
   const [role,         setRole]         = useState<(typeof roles)[number]>("student");
+  const [publicUserId, setPublicUserId] = useState("");
+  const [employeeId,   setEmployeeId]   = useState("");
+  const [designation,  setDesignation]  = useState("");
+  const [specialization, setSpecialization] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [error,        setError]        = useState<string | null>(null);
   const [success,      setSuccess]      = useState<string | null>(null);
@@ -50,7 +54,17 @@ export default function RegisterFormClient() {
     const response = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password, role, department_id: departmentId || null }),
+      body: JSON.stringify({
+        name,
+        email,
+        password,
+        role,
+        public_user_id: publicUserId || null,
+        employee_id: role === "faculty" ? employeeId || null : null,
+        designation: role === "faculty" ? designation || null : null,
+        specialization: role === "faculty" ? (specialization || null) : null,
+        department_id: departmentId || null,
+      }),
     });
 
     setLoading(false);
@@ -63,8 +77,18 @@ export default function RegisterFormClient() {
 
     const createdEmail = email;
     const createdRole  = role;
-    setName(""); setEmail(""); setPassword(""); setRole("student"); setDepartmentId("");
-    setSuccess(`Account created for ${createdEmail} (${createdRole}).`);
+    setName("");
+    setEmail("");
+    setPassword("");
+    setRole("student");
+    setPublicUserId("");
+    setEmployeeId("");
+    setDesignation("");
+    setSpecialization("");
+    setDepartmentId("");
+    setSuccess(
+      `Account created for ${createdEmail} (${createdRole})${publicUserId ? ` with user ID ${publicUserId.toUpperCase()}` : ""}.`,
+    );
     router.refresh();
   }
 
@@ -160,6 +184,23 @@ export default function RegisterFormClient() {
 
         {/* Department code or ID */}
         <div>
+          <label htmlFor="reg-user-id" className="cp-label">
+            User ID <span className="font-normal text-zinc-400">(optional, unique)</span>
+          </label>
+          <input
+            id="reg-user-id"
+            type="text"
+            value={publicUserId}
+            onChange={(e) => setPublicUserId(e.target.value)}
+            placeholder="STU-2401, FAC-001, REG-01, etc."
+            className="cp-input"
+          />
+          <p className="mt-1 text-xs text-zinc-500">
+            If left blank, a role-based ID is generated automatically.
+          </p>
+        </div>
+
+        <div>
           <label htmlFor="reg-dept" className="cp-label">Department code or ID <span className="font-normal text-zinc-400">(optional)</span></label>
           <input
             id="reg-dept"
@@ -170,6 +211,50 @@ export default function RegisterFormClient() {
             className="cp-input"
           />
         </div>
+
+        {role === "faculty" ? (
+          <div className="cp-card-2 space-y-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Faculty profile</p>
+            <div>
+              <label htmlFor="reg-employee-id" className="cp-label">Faculty ID (employee_id) <span className="text-red-600">*</span></label>
+              <input
+                id="reg-employee-id"
+                type="text"
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
+                placeholder="FAC-001 / EMP-2026-12"
+                className="cp-input"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="reg-designation" className="cp-label">Designation <span className="text-red-600">*</span></label>
+              <input
+                id="reg-designation"
+                type="text"
+                value={designation}
+                onChange={(e) => setDesignation(e.target.value)}
+                placeholder="Lecturer / Assistant Professor"
+                className="cp-input"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="reg-specialization" className="cp-label">Specialization <span className="font-normal text-zinc-400">(optional)</span></label>
+              <input
+                id="reg-specialization"
+                type="text"
+                value={specialization}
+                onChange={(e) => setSpecialization(e.target.value)}
+                placeholder="AI, Networks, Databases"
+                className="cp-input"
+              />
+            </div>
+            <p className="text-xs text-zinc-500">
+              Faculty ID is stored in the faculty profile and can be used for assignment/search.
+            </p>
+          </div>
+        ) : null}
 
         {error   ? <InlineAlert tone="error"   message={error}   /> : null}
         {success ? <InlineAlert tone="success" message={success} /> : null}

@@ -12,6 +12,9 @@ import StatusBadge from "@/components/ui/StatusBadge";
 type ScheduleItem = {
   _id: string;
   schedule_type: "class" | "exam";
+  course?: { name: string; code: string } | null;
+  faculty?: { employee_id: string; designation: string; name: string } | null;
+  room?: { room_code: string; building: string } | null;
   day: string;
   date?: string | null;
   start_time: string;
@@ -60,10 +63,18 @@ export default function ScheduleViewerClient({ role }: { role?: AppRole }) {
   useEffect(() => { void load(); }, [load]);
 
   const columns = [
+    {
+      key: "course",
+      label: "Course",
+      render: (s: ScheduleItem) =>
+        s.course ? `${s.course.code} - ${s.course.name}` : <span className="text-zinc-400">—</span>,
+    },
     { key: "type",     label: "Type",     render: (s: ScheduleItem) => <StatusBadge label={s.schedule_type} tone="default" /> },
     { key: "day",      label: "Day",      render: (s: ScheduleItem) => s.day },
     { key: "date",     label: "Date",     render: (s: ScheduleItem) => s.date ? new Date(s.date).toLocaleDateString() : <span className="text-zinc-400">—</span> },
     { key: "time",     label: "Time",     render: (s: ScheduleItem) => `${s.start_time} – ${s.end_time}` },
+    { key: "room",     label: "Room",     render: (s: ScheduleItem) => s.room ? `${s.room.room_code} - ${s.room.building}` : <span className="text-zinc-400">—</span> },
+    { key: "faculty",  label: "Faculty",  render: (s: ScheduleItem) => s.faculty ? `${s.faculty.name} (${s.faculty.employee_id})` : <span className="text-zinc-400">—</span> },
     { key: "semester", label: "Semester", render: (s: ScheduleItem) => s.semester },
     { key: "section",  label: "Section",  render: (s: ScheduleItem) => s.section },
     { key: "status",   label: "Status",   render: (s: ScheduleItem) => <StatusBadge label={s.status} /> },

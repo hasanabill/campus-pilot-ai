@@ -26,6 +26,7 @@ const navItems: NavItem[] = [
   /* ── Core ── */
   { href: "/dashboard",           label: "Dashboard",        icon: "dashboard",     section: "core",   roles: ["student", "faculty", "admin", "registrar"] },
   { href: "/chat",                label: "AI Chat",          icon: "chat",          section: "core",   roles: ["student", "faculty", "admin", "registrar"] },
+  { href: "/profile",             label: "My Profile",       icon: "user",          section: "core",   roles: ["student", "faculty", "admin", "registrar"] },
   { href: "/notifications",       label: "Notifications",    icon: "bell",          section: "core",   roles: ["student", "faculty", "admin", "registrar"] },
   { href: "/notices",             label: "Notices",          icon: "bell",          section: "core",   roles: ["student", "faculty", "admin", "registrar"] },
   { href: "/schedules",           label: "Schedules",        icon: "calendar",      section: "core",   roles: ["student", "faculty", "admin", "registrar"] },
@@ -37,7 +38,6 @@ const navItems: NavItem[] = [
   { href: "/dashboard/schedules", label: "Schedule Admin",   icon: "calendarEdit",  section: "mgmt",   roles: ["admin"] },
   { href: "/dashboard/documents", label: "Document Center",  icon: "doc",           section: "mgmt",   roles: ["faculty", "admin", "registrar"] },
   { href: "/dashboard/approvals", label: "Approvals",        icon: "check",         section: "mgmt",   roles: ["admin", "registrar"] },
-  { href: "/dashboard/workflow",  label: "Workflow Tasks",   icon: "activity",      section: "mgmt",   roles: ["faculty", "admin", "registrar"] },
   { href: "/dashboard/notices",   label: "Notice Composer",  icon: "bell",          section: "mgmt",   roles: ["admin", "registrar"] },
   { href: "/dashboard/notifications", label: "Broadcasts",    icon: "bell",          section: "mgmt",   roles: ["admin", "registrar"] },
   { href: "/dashboard/reports",   label: "Reports",          icon: "chart",         section: "mgmt",   roles: ["faculty", "admin", "registrar"] },
@@ -63,9 +63,24 @@ const roleStyle: Record<AppRole, string> = {
   student:   "border-emerald-200 bg-emerald-50 text-emerald-700",
 };
 
-function isActive(pathname: string, href: string): boolean {
+function isActive(pathname: string, href: string, allHrefs: string[]): boolean {
   if (href === "/dashboard") return pathname === "/dashboard";
-  return pathname === href || pathname.startsWith(`${href}/`);
+  const directMatch = pathname === href;
+  const nestedMatch = pathname.startsWith(`${href}/`);
+  if (!directMatch && !nestedMatch) {
+    return false;
+  }
+  if (directMatch) {
+    return true;
+  }
+
+  const hasMoreSpecificMatch = allHrefs.some(
+    (candidate) =>
+      candidate !== href &&
+      candidate.startsWith(`${href}/`) &&
+      (pathname === candidate || pathname.startsWith(`${candidate}/`)),
+  );
+  return !hasMoreSpecificMatch;
 }
 
 /* ─── Icons ──────────────────────────────────────────────────── */
@@ -212,7 +227,7 @@ export default function AppShellClient({
               )}
               <div className="space-y-0.5">
                 {items.map((item) => {
-                  const active = isActive(pathname, item.href);
+                  const active = isActive(pathname, item.href, roleNav.map((entry) => entry.href));
                   return (
                     <Link
                       key={item.href}

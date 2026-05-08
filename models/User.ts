@@ -9,6 +9,7 @@ const userSchema = new Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password_hash: { type: String, required: true, select: false },
     role: { type: String, enum: USER_ROLES, default: "student" },
+    public_user_id: { type: String, unique: true, sparse: true, uppercase: true, trim: true, default: null },
     department_id: { type: String, default: null },
     phone: { type: String, default: null },
     is_active: { type: Boolean, default: true },
@@ -19,6 +20,7 @@ const userSchema = new Schema(
 );
 
 userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ public_user_id: 1 }, { unique: true, sparse: true });
 userSchema.index({ role: 1 });
 userSchema.index({ department_id: 1 });
 

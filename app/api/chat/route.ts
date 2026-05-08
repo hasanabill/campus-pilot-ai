@@ -1,8 +1,37 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
-import { createChatRequestSchema, createChatResponseAndLog } from "@/services/chatService";
+import {
+  clearChatSessionForUser,
+  createChatRequestSchema,
+  createChatResponseAndLog,
+  getChatSessionForUser,
+} from "@/services/chatService";
 import { enforceRateLimit } from "@/utils/request";
+
+export async function GET(request: Request) {
+  try {
+    const rate = enforceRateLimit(request, {
+      name: "chat-get",
+      windowMs: 60_000,
+      maxRequests: 60,
+    });
+    if (!rate.allowed) {
+      return NextResponse.json({ error: "Too many chat requests." }, { status: 429 });
+    }
+
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+
+    const result = await getChatSessionForUser(session.user.id);
+    return NextResponse.json(result, { status: 200 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to load chat session.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -40,6 +69,30 @@ export async function POST(request: Request) {
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Chat request failed.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const rate = enforceRateLimit(request, {
+      name: "chat-delete",
+      windowMs: 60_000,
+      maxRequests: 20,
+    });
+    if (!rate.allowed) {
+      return NextResponse.json({ error: "Too many chat clear requests." }, { status: 429 });
+    }
+
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+
+    const result = await clearChatSessionForUser(session.user.id);
+    return NextResponse.json(result, { status: 200 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to clear chat session.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

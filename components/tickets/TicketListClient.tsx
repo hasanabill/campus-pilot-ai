@@ -158,8 +158,8 @@ export default function TicketListClient({ adminMode = false }: { adminMode?: bo
           <input
             value={assigneeDrafts[ticket._id] ?? ""}
             onChange={(e) => setAssigneeDrafts((prev) => ({ ...prev, [ticket._id]: e.target.value }))}
-            placeholder="User ID…"
-            className="w-28 rounded-lg border border-zinc-200 px-2 py-1 text-xs outline-none focus:border-zinc-400"
+            placeholder="User ID / email…"
+            className="w-44 rounded-lg border border-zinc-200 px-2 py-1 text-xs outline-none focus:border-zinc-400"
           />
           <button
             type="button"

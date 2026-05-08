@@ -26,6 +26,61 @@ type CreateChatInput = z.infer<typeof createChatRequestSchema> & {
   department_id?: string | null;
 };
 
+type ChatHistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+function getPersistentSessionId(userId: string): string {
+  return `u_${userId}`;
+}
+
+function buildHistoryFromLogs(
+  logs: Array<{ query: string; response: string }>,
+  maxMessages = 20,
+): ChatHistoryMessage[] {
+  const messages: ChatHistoryMessage[] = [];
+  for (const log of logs) {
+    if (log.query?.trim()) messages.push({ role: "user", content: log.query });
+    if (log.response?.trim()) messages.push({ role: "assistant", content: log.response });
+  }
+  return messages.slice(-maxMessages);
+}
+
+export async function getChatSessionForUser(userId: string) {
+  if (!Types.ObjectId.isValid(userId)) {
+    throw new Error("Invalid user id for chat session.");
+  }
+
+  await connectToDatabase();
+  const sessionId = getPersistentSessionId(userId);
+  const logs = await ChatLog.find({
+    user_id: new Types.ObjectId(userId),
+    session_id: sessionId,
+  })
+    .select("query response")
+    .sort({ created_at: 1 })
+    .lean<Array<{ query: string; response: string }>>();
+
+  return {
+    session_id: sessionId,
+    messages: buildHistoryFromLogs(logs),
+  };
+}
+
+export async function clearChatSessionForUser(userId: string) {
+  if (!Types.ObjectId.isValid(userId)) {
+    throw new Error("Invalid user id for chat session.");
+  }
+  await connectToDatabase();
+  const sessionId = getPersistentSessionId(userId);
+  await ChatLog.deleteMany({
+    user_id: new Types.ObjectId(userId),
+    session_id: sessionId,
+  });
+  return { session_id: sessionId, cleared: true as const };
+}
+
 export async function createChatResponseAndLog(input: CreateChatInput) {
   const parsed = createChatRequestSchema.parse(input);
 
@@ -35,6 +90,18 @@ export async function createChatResponseAndLog(input: CreateChatInput) {
 
   await connectToDatabase();
 
+  const sessionId = getPersistentSessionId(input.user_id);
+  const priorLogs = await ChatLog.find({
+    user_id: new Types.ObjectId(input.user_id),
+    session_id: sessionId,
+  })
+    .select("query response")
+    .sort({ created_at: -1 })
+    .limit(10)
+    .lean<Array<{ query: string; response: string }>>();
+  const persistedHistory = buildHistoryFromLogs([...priorLogs].reverse());
+  const effectiveHistory = persistedHistory.length > 0 ? persistedHistory : parsed.history;
+
   const faqMatch = await findFaqAnswer(parsed.question);
   const result = faqMatch
     ? {
@@ -43,7 +110,7 @@ export async function createChatResponseAndLog(input: CreateChatInput) {
       }
     : await generateChatResponse(parsed.question, {
         topK: parsed.topK,
-        history: parsed.history,
+        history: effectiveHistory,
         departmentId: input.department_id ?? undefined,
       });
 
@@ -54,10 +121,6 @@ export async function createChatResponseAndLog(input: CreateChatInput) {
 
   const maxScore =
     result.context.length > 0 ? Math.max(...result.context.map((item) => item.score)) : null;
-
-  const sessionId =
-    parsed.session_id ??
-    `s_${input.user_id.slice(-6)}_${Date.now().toString(36)}`;
 
   let routedTicketId: Types.ObjectId | null = null;
   if (parsed.create_ticket) {

@@ -2,9 +2,12 @@ import { Types } from "mongoose";
 import { z } from "zod";
 
 import { connectToDatabase } from "@/lib/mongodb";
+import Course from "@/models/Course";
 import Faculty from "@/models/Faculty";
+import Room from "@/models/Room";
 import Schedule from "@/models/Schedule";
 import ScheduleChangeLog from "@/models/ScheduleChangeLog";
+import User from "@/models/User";
 import { notifyScheduleChange } from "@/services/notificationService";
 
 const scheduleTypes = ["class", "exam"] as const;
@@ -260,8 +263,50 @@ export async function listSchedules(query: z.infer<typeof listSchedulesQuerySche
     Schedule.countDocuments(filter),
   ]);
 
+  const courseIds = Array.from(new Set(schedules.map((s) => String(s.course_id))));
+  const facultyIds = Array.from(new Set(schedules.map((s) => String(s.faculty_id))));
+  const roomIds = Array.from(new Set(schedules.map((s) => String(s.room_id))));
+
+  const [courses, faculty, rooms] = await Promise.all([
+    Course.find({ _id: { $in: courseIds } }).select("_id name code").lean<Array<{ _id: Types.ObjectId; name: string; code: string }>>(),
+    Faculty.find({ _id: { $in: facultyIds } })
+      .select("_id user_id employee_id designation")
+      .lean<Array<{ _id: Types.ObjectId; user_id: Types.ObjectId; employee_id: string; designation: string }>>(),
+    Room.find({ _id: { $in: roomIds } }).select("_id room_code building").lean<Array<{ _id: Types.ObjectId; room_code: string; building: string }>>(),
+  ]);
+
+  const facultyUserIds = Array.from(new Set(faculty.map((f) => String(f.user_id))));
+  const users = await User.find({ _id: { $in: facultyUserIds } })
+    .select("_id name")
+    .lean<Array<{ _id: Types.ObjectId; name: string }>>();
+  const userNameMap = new Map<string, string>(users.map((u) => [String(u._id), u.name]));
+
+  const courseMap = new Map<string, { name: string; code: string }>(
+    courses.map((c) => [String(c._id), { name: c.name, code: c.code }]),
+  );
+  const facultyMap = new Map<string, { employee_id: string; designation: string; name: string }>(
+    faculty.map((f) => [
+      String(f._id),
+      {
+        employee_id: f.employee_id,
+        designation: f.designation,
+        name: userNameMap.get(String(f.user_id)) ?? "Unknown",
+      },
+    ]),
+  );
+  const roomMap = new Map<string, { room_code: string; building: string }>(
+    rooms.map((r) => [String(r._id), { room_code: r.room_code, building: r.building }]),
+  );
+
+  const enriched = schedules.map((s) => ({
+    ...s,
+    course: courseMap.get(String(s.course_id)) ?? null,
+    faculty: facultyMap.get(String(s.faculty_id)) ?? null,
+    room: roomMap.get(String(s.room_id)) ?? null,
+  }));
+
   return {
-    schedules,
+    schedules: enriched,
     total,
     page,
     limit,
