@@ -1,4 +1,5 @@
 import { Types } from "mongoose";
+import { z } from "zod";
 
 import { getCache, getOrSetCache, setCache } from "@/lib/cache";
 import { openai } from "@/lib/openai";
@@ -50,6 +51,51 @@ const TOP_K_DEFAULT = 5;
 const EMBEDDING_CACHE_TTL_MS = 10 * 60 * 1000;
 const SEARCH_CACHE_TTL_MS = 2 * 60 * 1000;
 const CHAT_CACHE_TTL_MS = 30 * 1000;
+const STRUCTURED_CACHE_TTL_MS = 5 * 60 * 1000;
+
+const TICKET_TYPES = [
+  "certificate",
+  "transcript",
+  "correction",
+  "permission",
+  "internship",
+  "other",
+] as const;
+const TICKET_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
+const ROUTING_DECISIONS = ["answer", "ask_clarifying", "route_to_ticket", "route_to_human"] as const;
+
+export const ticketClassificationSchema = z.object({
+  type: z.enum(TICKET_TYPES),
+  priority: z.enum(TICKET_PRIORITIES),
+  confidence: z.number().min(0).max(1),
+  title: z.string().min(3).max(200),
+});
+
+export const suggestedTicketSchema = z.object({
+  title: z.string().min(3).max(200),
+  description: z.string().min(10).max(5000),
+  type: z.enum(TICKET_TYPES),
+  priority: z.enum(TICKET_PRIORITIES),
+});
+
+export const chatRoutingSchema = z.object({
+  decision: z.enum(ROUTING_DECISIONS),
+  reason: z.string().max(800),
+  confidence: z.number().min(0).max(1).optional(),
+  clarifying_question: z.string().max(600).optional(),
+  suggested_ticket: suggestedTicketSchema.optional(),
+});
+
+export type TicketClassification = z.infer<typeof ticketClassificationSchema>;
+export type ChatRoutingDecision = z.infer<typeof chatRoutingSchema>;
+
+export function isAiExtendedFeaturesEnabled(): boolean {
+  return process.env.ENABLE_AI_EXTENDED_FEATURES !== "false";
+}
+
+export function isTimetableProposerEnabled(): boolean {
+  return process.env.ENABLE_TIMETABLE_PROPOSER !== "false";
+}
 const STOP_WORDS = new Set([
   "a",
   "an",
@@ -404,4 +450,98 @@ export async function summarizeText(
   });
 
   return completion.choices[0]?.message?.content?.trim() ?? "";
+}
+
+type ExtractStructuredArgs<T extends z.ZodTypeAny> = {
+  system: string;
+  user: string;
+  schema: T;
+  cacheKey?: string;
+  ttlMs?: number;
+};
+
+export async function extractStructured<T extends z.ZodTypeAny>(
+  args: ExtractStructuredArgs<T>,
+): Promise<z.infer<T>> {
+  const ttl = args.ttlMs ?? STRUCTURED_CACHE_TTL_MS;
+  const key = args.cacheKey ?? `struct:${stableHash(`${args.system}|${args.user}`)}`;
+  const cached = getCache<z.infer<T>>(key);
+  if (cached) {
+    return cached;
+  }
+
+  const completion = await openai.chat.completions.create({
+    model: CHAT_MODEL,
+    temperature: 0.1,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: args.system },
+      { role: "user", content: args.user },
+    ],
+  });
+
+  const raw = completion.choices[0]?.message?.content?.trim() ?? "{}";
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    throw new Error("AI returned invalid JSON for structured extraction.");
+  }
+
+  const parsed = args.schema.safeParse(json);
+  if (!parsed.success) {
+    throw new Error(`Structured extraction failed validation: ${parsed.error.message}`);
+  }
+
+  setCache(key, parsed.data, ttl);
+  return parsed.data;
+}
+
+export async function classifyTicketTypePriority(text: string): Promise<TicketClassification> {
+  const normalized = text.trim();
+  if (!normalized) {
+    throw new Error("Text is required for ticket classification.");
+  }
+
+  return extractStructured({
+    system:
+      "You classify academic department service requests. Return compact JSON only. " +
+      "Map requests to one ticket type: certificate, transcript, correction, permission, internship, other. " +
+      "Choose priority: low, medium, high, urgent based on urgency and deadlines mentioned. " +
+      "Provide confidence between 0 and 1. Provide a short actionable title (max 120 chars).",
+    user: `Service request text:\n${trimText(normalized, 4000)}`,
+    schema: ticketClassificationSchema,
+    cacheKey: `ticket-classify:${stableHash(normalized)}`,
+  });
+}
+
+export type ClassifyChatRoutingInput = {
+  question: string;
+  role: string;
+  answerPreview: string;
+  kbChunkCount: number;
+  maxScore: number | null;
+};
+
+export async function classifyChatRouting(input: ClassifyChatRoutingInput): Promise<ChatRoutingDecision> {
+  const cacheKey = `chat-route:${stableHash(JSON.stringify(input))}`;
+  return extractStructured({
+    system:
+      "You route academic chat queries. Return JSON only. Decisions: " +
+      "answer = knowledge response is enough; ask_clarifying = need specific missing details; " +
+      "route_to_ticket = formal tracked request/triage needed (student-facing intake); " +
+      "route_to_human = sensitive/complex and needs staff (discrimination, grades disputes, legal). " +
+      "If route_to_ticket and role is student, include suggested_ticket with title, description, type, priority " +
+      "aligned with transcript/certificate/correction/permission/internship/other. " +
+      "Never invent policy facts; suggested_ticket should restate the user's request clearly.",
+    user: JSON.stringify({
+      question: trimText(input.question, 800),
+      role: input.role,
+      assistant_answer_preview: trimText(input.answerPreview, 1200),
+      kb_chunk_count: input.kbChunkCount,
+      kb_best_score: input.maxScore,
+    }),
+    schema: chatRoutingSchema,
+    cacheKey,
+  });
 }

@@ -7,18 +7,33 @@ import ChatMessageList from "@/components/chat/ChatMessageList";
 import InlineAlert from "@/components/ui/InlineAlert";
 
 type Message = { role: "user" | "assistant"; content: string };
+type SuggestedTicketPayload = {
+  title: string;
+  description: string;
+  type: string;
+  priority: string;
+};
+
 type ChatApiResponse = {
   answer: string;
   session_id: string;
   context?: Array<{ chunkId: string; score: number }>;
   routed_to_ticket_id?: string | null;
   source?: "faq" | "knowledge_base";
+  routing?: {
+    decision: string;
+    reason: string;
+    confidence?: number;
+    suggested_ticket: SuggestedTicketPayload | null;
+  };
 };
 type ChatSessionResponse = {
   session_id: string;
   messages: Message[];
 };
-type ChatClientProps = { userName?: string | null };
+type AppRole = "student" | "faculty" | "admin" | "registrar";
+
+type ChatClientProps = { userName?: string | null; userRole?: AppRole };
 
 const suggestedPrompts = [
   "What documents are needed for a transcript request?",
@@ -27,7 +42,7 @@ const suggestedPrompts = [
   "What is the ticket escalation workflow?",
 ];
 
-export default function ChatClient({ userName }: ChatClientProps) {
+export default function ChatClient({ userName, userRole }: ChatClientProps) {
   const [messages,          setMessages]          = useState<Message[]>([]);
   const [question,          setQuestion]          = useState("");
   const [sessionId,         setSessionId]         = useState<string | undefined>(undefined);
@@ -35,6 +50,9 @@ export default function ChatClient({ userName }: ChatClientProps) {
   const [error,             setError]             = useState<string | null>(null);
   const [notice,            setNotice]            = useState<string | null>(null);
   const [lastFailedQuestion, setLastFailedQuestion] = useState<string | null>(null);
+  const [suggestedTicket, setSuggestedTicket] = useState<SuggestedTicketPayload | null>(null);
+  const [routingHint, setRoutingHint] = useState<string | null>(null);
+  const [ticketCreating, setTicketCreating] = useState(false);
 
   const history = useMemo(() => messages.slice(-10), [messages]);
 
@@ -63,6 +81,8 @@ export default function ChatClient({ userName }: ChatClientProps) {
     setError(null);
     setNotice(null);
     setLastFailedQuestion(null);
+    setSuggestedTicket(null);
+    setRoutingHint(null);
     setIsLoading(true);
 
     try {
@@ -80,6 +100,18 @@ export default function ChatClient({ userName }: ChatClientProps) {
 
       setSessionId(payload.session_id);
       setMessages((prev) => [...prev, { role: "assistant", content: payload.answer }]);
+      if (payload.routing?.reason) {
+        setRoutingHint(payload.routing.reason);
+      }
+      if (
+        userRole === "student" &&
+        payload.routing?.decision === "route_to_ticket" &&
+        payload.routing.suggested_ticket
+      ) {
+        setSuggestedTicket(payload.routing.suggested_ticket);
+      } else {
+        setSuggestedTicket(null);
+      }
       if (payload.source === "faq") {
         setNotice("Answered from the managed FAQ library.");
       } else if (payload.source === "knowledge_base") {
@@ -103,6 +135,34 @@ export default function ChatClient({ userName }: ChatClientProps) {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await submitQuestion(question);
+  }
+
+  async function createSuggestedTicket() {
+    if (!suggestedTicket || ticketCreating) return;
+    setTicketCreating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: suggestedTicket.title,
+          description: suggestedTicket.description,
+          type: suggestedTicket.type,
+          priority: suggestedTicket.priority,
+        }),
+      });
+      const payload = (await res.json()) as { ticket?: { _id?: string }; error?: string };
+      if (!res.ok) {
+        throw new Error(payload.error ?? "Unable to create ticket.");
+      }
+      setNotice(`Ticket created${payload.ticket?._id ? `: ${payload.ticket._id}` : ""}.`);
+      setSuggestedTicket(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ticket creation failed.");
+    } finally {
+      setTicketCreating(false);
+    }
   }
 
   async function routeLastQuestionToTicket() {
@@ -215,6 +275,42 @@ export default function ChatClient({ userName }: ChatClientProps) {
       {notice && (
         <div className="mt-3">
           <InlineAlert message={notice} tone="success" />
+        </div>
+      )}
+      {routingHint && (
+        <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-xs text-zinc-700">
+          <span className="font-semibold text-zinc-900">Routing: </span>
+          {routingHint}
+        </div>
+      )}
+      {userRole === "student" && suggestedTicket && (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
+          <p className="text-sm font-semibold text-zinc-900">Suggested ticket draft</p>
+          <p className="mt-1 text-xs text-zinc-700">
+            <span className="font-medium">Title:</span> {suggestedTicket.title}
+          </p>
+          <p className="mt-1 text-xs text-zinc-700">
+            <span className="font-medium">Type:</span> {suggestedTicket.type} ·{" "}
+            <span className="font-medium">Priority:</span> {suggestedTicket.priority}
+          </p>
+          <p className="mt-2 line-clamp-3 text-xs text-zinc-600">{suggestedTicket.description}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={ticketCreating}
+              onClick={() => void createSuggestedTicket()}
+              className="cp-btn-primary text-xs"
+            >
+              {ticketCreating ? "Creating…" : "Create ticket from suggestion"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSuggestedTicket(null)}
+              className="cp-btn-secondary text-xs"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
       {lastFailedQuestion && (

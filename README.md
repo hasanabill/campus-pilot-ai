@@ -24,6 +24,9 @@ OPENAI_EMBEDDING_MODEL=
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
+# Optional feature gates (omit or leave unset for defaults)
+# ENABLE_AI_EXTENDED_FEATURES=false   # disables AI routing helpers, ticket classifier intake, /api/tickets/suggest
+# ENABLE_TIMETABLE_PROPOSER=false        # disables /api/timetable/* proposal + apply
 ```
 
 Run the development server:
@@ -55,7 +58,9 @@ Account creation is admin-only. Student profile records are created automaticall
 ## Implemented Modules
 
 - Authentication and role-based access control.
-- AI chat with knowledge base retrieval and FAQ fallback.
+- AI chat with knowledge base retrieval, FAQ fallback, and optional intelligent routing metadata.
+- AI-suggested service request drafts and optional auto-categorization for tickets.
+- Timetable proposal generator (deterministic) with draft schedule application.
 - Chat-to-ticket routing for students.
 - Knowledge base upload and semantic search.
 - Ticket creation, assignment, status workflow, escalation, and activity logs.
@@ -67,7 +72,6 @@ Account creation is admin-only. Student profile records are created automaticall
 - Department notices with role-filtered reading and audience broadcasts.
 - Master data management for departments, students, faculty, courses, rooms, and lab resources.
 - Notifications, reports, analytics, and admin activity logs.
-- Workflow task tracking and reminder dispatch.
 
 ## Important Routes
 
@@ -83,6 +87,7 @@ Account creation is admin-only. Student profile records are created automaticall
 - `/tickets/new` student ticket submission
 - `/dashboard/tickets` ticket operations
 - `/dashboard/schedules` schedule admin
+- `/dashboard/timetable` timetable proposal + apply (draft schedules)
 - `/dashboard/master-data` master data admin
 - `/dashboard/faqs` FAQ management
 - `/dashboard/kb` knowledge base upload

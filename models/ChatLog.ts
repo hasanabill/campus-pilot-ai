@@ -11,6 +11,10 @@ const chatLogSchema = new Schema(
     ],
     confidence_score: { type: Number, min: 0, max: 1, default: null },
     routed_to_ticket_id: { type: Schema.Types.ObjectId, ref: "Ticket", default: null },
+    routing_decision: { type: String, default: null },
+    routing_reason: { type: String, default: null },
+    routing_confidence: { type: Number, min: 0, max: 1, default: null },
+    routing_suggested_ticket: { type: Schema.Types.Mixed, default: null },
   },
   { timestamps: { createdAt: "created_at", updatedAt: false } },
 );

@@ -3,8 +3,15 @@ import { z } from "zod";
 
 import { connectToDatabase } from "@/lib/mongodb";
 import ChatLog from "@/models/ChatLog";
+import {
+  classifyChatRouting,
+  classifyTicketTypePriority,
+  generateChatResponse,
+  isAiExtendedFeaturesEnabled,
+  type ChatRoutingDecision,
+  type KnowledgeSearchResult,
+} from "@/services/aiService";
 import { findFaqAnswer } from "@/services/faqService";
-import { generateChatResponse } from "@/services/aiService";
 import { createTicket } from "@/services/ticketService";
 
 const chatHistoryItemSchema = z.object({
@@ -30,6 +37,8 @@ type ChatHistoryMessage = {
   role: "user" | "assistant";
   content: string;
 };
+
+const KB_STRONG_SCORE_THRESHOLD = 0.28;
 
 function getPersistentSessionId(userId: string): string {
   return `u_${userId}`;
@@ -106,7 +115,7 @@ export async function createChatResponseAndLog(input: CreateChatInput) {
   const result = faqMatch
     ? {
         answer: faqMatch.answer,
-        context: [],
+        context: [] as KnowledgeSearchResult[],
       }
     : await generateChatResponse(parsed.question, {
         topK: parsed.topK,
@@ -121,20 +130,88 @@ export async function createChatResponseAndLog(input: CreateChatInput) {
 
   const maxScore =
     result.context.length > 0 ? Math.max(...result.context.map((item) => item.score)) : null;
+  const kbChunkCount = result.context.length;
+
+  let answer = result.answer;
+  let routing: ChatRoutingDecision;
+
+  if (faqMatch) {
+    routing = {
+      decision: "answer",
+      reason: "Answer matched a managed FAQ entry.",
+      confidence: 1,
+    };
+  } else if (!isAiExtendedFeaturesEnabled()) {
+    routing = {
+      decision: "answer",
+      reason: "AI routing features disabled via ENABLE_AI_EXTENDED_FEATURES.",
+    };
+  } else if (maxScore !== null && maxScore >= KB_STRONG_SCORE_THRESHOLD) {
+    routing = {
+      decision: "answer",
+      reason: "Knowledge base context score is strong enough to answer without escalation.",
+      confidence: Math.min(1, maxScore),
+    };
+  } else {
+    try {
+      routing = await classifyChatRouting({
+        question: parsed.question,
+        role: input.role ?? "student",
+        answerPreview: answer,
+        kbChunkCount,
+        maxScore,
+      });
+    } catch {
+      routing = {
+        decision: "answer",
+        reason: "Routing classification failed; defaulting to the generated answer.",
+      };
+    }
+  }
+
+  if (routing.decision === "ask_clarifying" && routing.clarifying_question) {
+    answer = routing.clarifying_question;
+  } else if (routing.decision === "route_to_human") {
+    answer = `${answer}\n\nThis topic may need a staff member. Please contact the department office or submit a formal request if you are a student.`.trim();
+  }
+
+  let suggestedTicketPayload = routing.suggested_ticket;
+  if (
+    isAiExtendedFeaturesEnabled() &&
+    input.role === "student" &&
+    routing.decision === "route_to_ticket" &&
+    !suggestedTicketPayload
+  ) {
+    try {
+      const cls = await classifyTicketTypePriority(parsed.question);
+      suggestedTicketPayload = {
+        title: cls.title,
+        description: parsed.question,
+        type: cls.type,
+        priority: cls.priority,
+      };
+    } catch {
+      suggestedTicketPayload = undefined;
+    }
+  }
 
   let routedTicketId: Types.ObjectId | null = null;
   if (parsed.create_ticket) {
     if (input.role !== "student") {
       throw new Error("Only students can create tickets from chat.");
     }
+    const ticketBody = {
+      title: (suggestedTicketPayload?.title ?? parsed.question).slice(0, 200),
+      description:
+        suggestedTicketPayload?.description ??
+        `Created from AI chat query:\n\n${parsed.question}`,
+      type: suggestedTicketPayload?.type ?? "other",
+      priority: suggestedTicketPayload?.priority ?? "medium",
+      auto_categorize: false as const,
+    };
     const ticket = await createTicket(
       { userId: input.user_id, role: input.role },
-      {
-        title: parsed.question.slice(0, 120),
-        description: `Created from AI chat query:\n\n${parsed.question}`,
-        type: "other",
-        priority: "medium",
-      },
+      ticketBody,
     );
     routedTicketId = new Types.ObjectId(String(ticket._id));
   }
@@ -143,17 +220,28 @@ export async function createChatResponseAndLog(input: CreateChatInput) {
     user_id: new Types.ObjectId(input.user_id),
     session_id: sessionId,
     query: parsed.question,
-    response: result.answer,
+    response: answer,
     matched_chunk_ids: matchedChunkIds,
     confidence_score: maxScore,
     routed_to_ticket_id: routedTicketId,
+    routing_decision: routing.decision,
+    routing_reason: routing.reason,
+    routing_confidence: routing.confidence ?? null,
+    routing_suggested_ticket: suggestedTicketPayload ?? null,
   });
 
   return {
-    answer: result.answer,
+    answer,
     session_id: sessionId,
     context: result.context,
     routed_to_ticket_id: routedTicketId ? String(routedTicketId) : null,
     source: faqMatch ? "faq" : "knowledge_base",
+    routing: {
+      decision: routing.decision,
+      reason: routing.reason,
+      confidence: routing.confidence,
+      suggested_ticket:
+        input.role === "student" && suggestedTicketPayload ? suggestedTicketPayload : null,
+    },
   };
 }

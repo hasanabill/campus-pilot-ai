@@ -36,6 +36,7 @@ export const listSchedulesQuerySchema = z.object({
   status: z.enum(scheduleStatuses).optional(),
   semester: z.string().optional(),
   day: z.string().optional(),
+  section: z.string().optional(),
   limit: z.number().int().min(1).max(200).optional(),
   page: z.number().int().min(1).optional(),
 });
@@ -246,6 +247,9 @@ export async function listSchedules(query: z.infer<typeof listSchedulesQuerySche
   }
   if (parsed.day) {
     filter.day = parsed.day;
+  }
+  if (parsed.section) {
+    filter.section = parsed.section;
   }
 
   const limit = parsed.limit ?? 100;

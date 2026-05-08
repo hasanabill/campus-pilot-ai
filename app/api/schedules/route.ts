@@ -61,6 +61,7 @@ export async function GET(request: Request) {
       status: searchParams.get("status") ?? undefined,
       semester: searchParams.get("semester") ?? undefined,
       day: searchParams.get("day") ?? undefined,
+      section: searchParams.get("section") ?? undefined,
       limit: searchParams.get("limit") ? Number(searchParams.get("limit")) : undefined,
       page: searchParams.get("page") ? Number(searchParams.get("page")) : undefined,
     });

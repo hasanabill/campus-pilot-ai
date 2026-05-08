@@ -5,6 +5,7 @@ import { connectToDatabase } from "@/lib/mongodb";
 import Student from "@/models/Student";
 import Ticket from "@/models/Ticket";
 import TicketActivityLog from "@/models/TicketActivityLog";
+import { classifyTicketTypePriority, isAiExtendedFeaturesEnabled } from "@/services/aiService";
 import { notifyTicketUpdate } from "@/services/notificationService";
 import { mapObjectIdsToPublicUserIds, resolveUserObjectId } from "@/services/userIdentityService";
 
@@ -14,14 +15,25 @@ const ticketStatuses = ["pending", "in_review", "approved", "rejected", "complet
 
 type AppRole = "student" | "faculty" | "admin" | "registrar";
 
-export const createTicketSchema = z.object({
-  title: z.string().min(3).max(200),
-  description: z.string().min(10).max(5000),
-  type: z.enum(ticketTypes),
-  priority: z.enum(ticketPriorities).optional().default("medium"),
-  due_date: z.string().datetime().optional().nullable(),
-  student_profile_id: z.string().optional(),
-});
+export const createTicketSchema = z
+  .object({
+    title: z.string().min(3).max(200),
+    description: z.string().min(10).max(5000),
+    type: z.enum(ticketTypes).optional(),
+    priority: z.enum(ticketPriorities).optional(),
+    due_date: z.string().datetime().optional().nullable(),
+    student_profile_id: z.string().optional(),
+    auto_categorize: z.boolean().optional().default(false),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.auto_categorize && !data.type) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["type"],
+        message: "type is required unless auto_categorize is true.",
+      });
+    }
+  });
 
 export const updateTicketSchema = z.object({
   status: z.enum(ticketStatuses).optional(),
@@ -44,6 +56,10 @@ export const assignTicketSchema = z.object({
 
 export const escalateTicketSchema = z.object({
   reason: z.string().max(500).optional(),
+});
+
+export const suggestTicketSchema = z.object({
+  text: z.string().min(10).max(8000),
 });
 
 type Requester = {
@@ -100,12 +116,35 @@ export async function createTicket(requester: Requester, payload: z.infer<typeof
 
   const studentId = await resolveStudentProfileId(requester, parsed.student_profile_id);
 
+  let resolvedType = parsed.type;
+  let resolvedPriority = parsed.priority ?? "medium";
+  let resolvedTitle = parsed.title;
+
+  if (!resolvedType) {
+    if (!parsed.auto_categorize) {
+      throw new Error("Ticket type is required unless auto_categorize is true.");
+    }
+    if (!isAiExtendedFeaturesEnabled()) {
+      throw new Error("auto_categorize requires ENABLE_AI_EXTENDED_FEATURES.");
+    }
+    const guess = await classifyTicketTypePriority(parsed.description);
+    resolvedType = guess.type;
+    resolvedPriority = parsed.priority ?? guess.priority;
+    if (resolvedTitle.trim().length < 4 && guess.title.trim().length > 0) {
+      resolvedTitle = guess.title;
+    }
+  }
+
+  if (!resolvedType) {
+    throw new Error("Unable to determine ticket type.");
+  }
+
   const ticket = await Ticket.create({
     student_id: studentId,
-    title: parsed.title,
+    title: resolvedTitle,
     description: parsed.description,
-    type: parsed.type,
-    priority: parsed.priority,
+    type: resolvedType,
+    priority: resolvedPriority,
     status: "pending",
     due_date: parsed.due_date ? new Date(parsed.due_date) : null,
   });
@@ -129,6 +168,27 @@ export async function createTicket(requester: Requester, payload: z.infer<typeof
   }
 
   return ticket.toObject();
+}
+
+export async function suggestTicketDraft(requester: Requester, payload: z.infer<typeof suggestTicketSchema>) {
+  const parsed = suggestTicketSchema.parse(payload);
+  if (requester.role !== "student") {
+    throw new Error("Only students can request ticket suggestions.");
+  }
+  if (!isAiExtendedFeaturesEnabled()) {
+    throw new Error("Ticket suggestions are disabled via ENABLE_AI_EXTENDED_FEATURES.");
+  }
+
+  const classification = await classifyTicketTypePriority(parsed.text);
+  return {
+    suggested_ticket: {
+      title: classification.title,
+      description: parsed.text,
+      type: classification.type,
+      priority: classification.priority,
+    },
+    confidence: classification.confidence,
+  };
 }
 
 export async function listTickets(requester: Requester, query: z.infer<typeof listTicketsQuerySchema>) {
