@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 import { connectToDatabase } from "@/lib/mongodb";
+import Department from "@/models/Department";
 import Faculty from "@/models/Faculty";
 import Student from "@/models/Student";
 import User, { USER_ROLES, type UserRole } from "@/models/User";
@@ -28,6 +29,36 @@ export const registerSchema = z.object({
   specialization: z.string().max(200).optional().nullable(),
   workload_limit: z.number().min(0).optional(),
 }).superRefine((value, ctx) => {
+  if ((value.role === "student" || value.role === "faculty") && !value.department_id?.trim()) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["department_id"],
+      message: "Department is required for student and faculty accounts.",
+    });
+  }
+  if (value.role === "student") {
+    if (!value.student_id || !value.student_id.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["student_id"],
+        message: "Student ID is required when role is student.",
+      });
+    }
+    if (!value.program || !value.program.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["program"],
+        message: "Program is required when role is student.",
+      });
+    }
+    if (!value.batch || !value.batch.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["batch"],
+        message: "Batch is required when role is student.",
+      });
+    }
+  }
   if (value.role === "faculty") {
     if (!value.employee_id || !value.employee_id.trim()) {
       ctx.addIssue({
@@ -104,9 +135,18 @@ function buildFacultyProfileDefaults(parsed: z.infer<typeof registerSchema>) {
   };
 }
 
+async function assertDepartmentExists(departmentId: string | null | undefined) {
+  if (!departmentId) return;
+  const department = await Department.findById(departmentId).select("_id").lean();
+  if (!department) {
+    throw new Error("Selected department was not found.");
+  }
+}
+
 export async function registerUser(payload: z.infer<typeof registerSchema>): Promise<SafeUser> {
   const parsed = registerSchema.parse(payload);
   await connectToDatabase();
+  await assertDepartmentExists(parsed.department_id);
   const normalizedPublicUserId = parsed.public_user_id
     ? normalizePublicUserId(parsed.public_user_id)
     : null;

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import InlineAlert from "@/components/ui/InlineAlert";
 
@@ -21,6 +21,12 @@ const rolePillStyle: Record<(typeof roles)[number], string> = {
   registrar: "border-amber-200  text-amber-700",
 };
 
+type DepartmentOption = {
+  _id: string;
+  name?: string;
+  code?: string;
+};
+
 export default function RegisterFormClient() {
   const router = useRouter();
 
@@ -29,14 +35,43 @@ export default function RegisterFormClient() {
   const [password,     setPassword]     = useState("");
   const [role,         setRole]         = useState<(typeof roles)[number]>("student");
   const [publicUserId, setPublicUserId] = useState("");
+  const [studentId,    setStudentId]    = useState("");
+  const [program,      setProgram]      = useState("");
+  const [semester,     setSemester]     = useState(1);
+  const [batch,        setBatch]        = useState("");
   const [employeeId,   setEmployeeId]   = useState("");
   const [designation,  setDesignation]  = useState("");
   const [specialization, setSpecialization] = useState("");
   const [departmentId, setDepartmentId] = useState("");
+  const [departments,  setDepartments]  = useState<DepartmentOption[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
   const [error,        setError]        = useState<string | null>(null);
   const [success,      setSuccess]      = useState<string | null>(null);
   const [loading,      setLoading]      = useState(false);
   const [fieldErrors,  setFieldErrors]  = useState<{ email?: string; password?: string }>({});
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      setDepartmentsLoading(true);
+      try {
+        const res = await fetch("/api/master-data/departments?limit=100");
+        const payload = (await res.json()) as { items?: DepartmentOption[]; error?: string };
+        if (!res.ok) throw new Error(payload.error ?? "Failed to load departments.");
+        if (active) {
+          setDepartments(payload.items ?? []);
+          setDepartmentId((prev) => prev || payload.items?.[0]?._id || "");
+        }
+      } catch (err) {
+        if (active) setError(err instanceof Error ? err.message : "Failed to load departments.");
+      } finally {
+        if (active) setDepartmentsLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,27 +86,41 @@ export default function RegisterFormClient() {
 
     setLoading(true);
 
+    const body = {
+      name,
+      email,
+      password,
+      role,
+      public_user_id: publicUserId || null,
+      department_id: departmentId || null,
+      ...(role === "student"
+        ? {
+            student_id: studentId,
+            program,
+            semester,
+            batch,
+          }
+        : {}),
+      ...(role === "faculty"
+        ? {
+            employee_id: employeeId,
+            designation,
+            specialization: specialization || null,
+          }
+        : {}),
+    };
+
     const response = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        email,
-        password,
-        role,
-        public_user_id: publicUserId || null,
-        employee_id: role === "faculty" ? employeeId || null : null,
-        designation: role === "faculty" ? designation || null : null,
-        specialization: role === "faculty" ? (specialization || null) : null,
-        department_id: departmentId || null,
-      }),
+      body: JSON.stringify(body),
     });
 
     setLoading(false);
 
     if (!response.ok) {
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(response.status === 409 ? "An account with this email already exists." : (payload?.error ?? "Account creation failed."));
+      setError(payload?.error ?? (response.status === 409 ? "An account with this email already exists." : "Account creation failed."));
       return;
     }
 
@@ -82,10 +131,14 @@ export default function RegisterFormClient() {
     setPassword("");
     setRole("student");
     setPublicUserId("");
+    setStudentId("");
+    setProgram("");
+    setSemester(1);
+    setBatch("");
     setEmployeeId("");
     setDesignation("");
     setSpecialization("");
-    setDepartmentId("");
+    setDepartmentId(departments[0]?._id ?? "");
     setSuccess(
       `Account created for ${createdEmail} (${createdRole})${publicUserId ? ` with user ID ${publicUserId.toUpperCase()}` : ""}.`,
     );
@@ -182,35 +235,106 @@ export default function RegisterFormClient() {
           </p>
         </div>
 
-        {/* Department code or ID */}
         <div>
           <label htmlFor="reg-user-id" className="cp-label">
-            User ID <span className="font-normal text-zinc-400">(optional, unique)</span>
+            Login/Public ID <span className="font-normal text-zinc-400">(optional, unique)</span>
           </label>
           <input
             id="reg-user-id"
             type="text"
             value={publicUserId}
             onChange={(e) => setPublicUserId(e.target.value)}
-            placeholder="STU-2401, FAC-001, REG-01, etc."
+            placeholder="LOGIN-STU-2401, LOGIN-FAC-001, REG-01"
             className="cp-input"
           />
           <p className="mt-1 text-xs text-zinc-500">
-            If left blank, a role-based ID is generated automatically.
+            This is the visible login/user identifier. Student ID and Faculty ID are stored separately in profile fields below.
           </p>
         </div>
 
         <div>
-          <label htmlFor="reg-dept" className="cp-label">Department code or ID <span className="font-normal text-zinc-400">(optional)</span></label>
-          <input
+          <label htmlFor="reg-dept" className="cp-label">
+            Department {(role === "student" || role === "faculty") ? <span className="text-red-600">*</span> : <span className="font-normal text-zinc-400">(optional)</span>}
+          </label>
+          <select
             id="reg-dept"
-            type="text"
             value={departmentId}
             onChange={(e) => setDepartmentId(e.target.value)}
-            placeholder="CIS, CSE, EEE, 10, or leave blank"
-            className="cp-input"
-          />
+            className="cp-select"
+            required={role === "student" || role === "faculty"}
+            disabled={departmentsLoading}
+          >
+            <option value="">{departmentsLoading ? "Loading departments..." : "Select department"}</option>
+            {departments.map((department) => (
+              <option key={department._id} value={department._id}>
+                {department.code ? `${department.code} - ` : ""}{department.name ?? department._id}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-zinc-500">
+            Departments are loaded from Master Data. Create the department there first if it is missing.
+          </p>
         </div>
+
+        {role === "student" ? (
+          <div className="cp-card-2 space-y-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Student profile</p>
+            <div>
+              <label htmlFor="reg-student-id" className="cp-label">Student ID <span className="text-red-600">*</span></label>
+              <input
+                id="reg-student-id"
+                type="text"
+                value={studentId}
+                onChange={(e) => setStudentId(e.target.value)}
+                placeholder="2026-001 / CIS-15-001"
+                className="cp-input"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="reg-program" className="cp-label">Program <span className="text-red-600">*</span></label>
+              <input
+                id="reg-program"
+                type="text"
+                value={program}
+                onChange={(e) => setProgram(e.target.value)}
+                placeholder="BSc in Computing and Information System"
+                className="cp-input"
+                required
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="reg-semester" className="cp-label">Semester <span className="text-red-600">*</span></label>
+                <input
+                  id="reg-semester"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={semester}
+                  onChange={(e) => setSemester(Number(e.target.value))}
+                  className="cp-input"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="reg-batch" className="cp-label">Batch <span className="text-red-600">*</span></label>
+                <input
+                  id="reg-batch"
+                  type="text"
+                  value={batch}
+                  onChange={(e) => setBatch(e.target.value)}
+                  placeholder="Batch 15"
+                  className="cp-input"
+                  required
+                />
+              </div>
+            </div>
+            <p className="text-xs text-zinc-500">
+              Student profile is created together with the account to avoid duplicate master-data entries.
+            </p>
+          </div>
+        ) : null}
 
         {role === "faculty" ? (
           <div className="cp-card-2 space-y-4">

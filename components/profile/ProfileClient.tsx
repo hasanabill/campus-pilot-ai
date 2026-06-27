@@ -151,7 +151,7 @@ export default function ProfileClient() {
                 value={departmentId}
                 onChange={(e) => setDepartmentId(e.target.value)}
                 className="cp-input"
-                placeholder="CIS, CSE, EEE, 10, or MongoDB _id"
+                placeholder="CIS, EEE, 10, or MongoDB _id"
               />
             </div>
           </div>

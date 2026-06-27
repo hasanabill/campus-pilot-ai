@@ -81,6 +81,14 @@ function canManageMasterData(role: AppRole): boolean {
   return role === "admin";
 }
 
+function assertProfileResourceIsReadOnly(resource: Resource) {
+  if (resource === "students" || resource === "faculty") {
+    throw new Error(
+      "Student and faculty profiles are created from Create User to keep account and profile data consistent.",
+    );
+  }
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -102,7 +110,7 @@ async function resolveDepartmentId(value: string): Promise<Types.ObjectId> {
 
   if (!department) {
     throw new Error(
-      `Department "${value}" was not found. Use a department code from master data, such as CIS/CSE/EEE/10, or a MongoDB _id.`,
+      `Department "${value}" was not found. Use a department code from master data, such as CIS/EEE/10, or a MongoDB _id.`,
     );
   }
 
@@ -147,6 +155,7 @@ export async function createMasterData(
 ) {
   if (!canManageMasterData(requester.role)) throw new Error("Only admin can manage master data.");
   resourceSchema.parse(resource);
+  assertProfileResourceIsReadOnly(resource);
   const parsed = createSchemas[resource].parse(payload) as Record<string, unknown>;
   await connectToDatabase();
   const normalized = await toObjectIds(resource, parsed);
@@ -161,6 +170,7 @@ export async function createMasterDataMany(
 ) {
   if (!canManageMasterData(requester.role)) throw new Error("Only admin can manage master data.");
   resourceSchema.parse(resource);
+  assertProfileResourceIsReadOnly(resource);
   if (!Array.isArray(payload)) {
     throw new Error("Invalid input: expected array.");
   }
@@ -180,6 +190,7 @@ export async function updateMasterData(
 ) {
   if (!canManageMasterData(requester.role)) throw new Error("Only admin can manage master data.");
   resourceSchema.parse(resource);
+  assertProfileResourceIsReadOnly(resource);
   if (!Types.ObjectId.isValid(id)) throw new Error("Invalid item id.");
   const parsed = createSchemas[resource].partial().parse(payload) as Record<string, unknown>;
   await connectToDatabase();
@@ -192,6 +203,7 @@ export async function updateMasterData(
 export async function deleteMasterData(requester: { role: AppRole }, resource: Resource, id: string) {
   if (!canManageMasterData(requester.role)) throw new Error("Only admin can manage master data.");
   resourceSchema.parse(resource);
+  assertProfileResourceIsReadOnly(resource);
   if (!Types.ObjectId.isValid(id)) throw new Error("Invalid item id.");
   await connectToDatabase();
   return modelMap[resource].findByIdAndDelete(id).lean();

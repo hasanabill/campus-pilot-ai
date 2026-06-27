@@ -36,7 +36,7 @@ const navItems: NavItem[] = [
   /* ── Management ── */
   { href: "/dashboard/tickets",   label: "Ticket Mgmt",      icon: "ticket",        section: "mgmt",   roles: ["faculty", "admin", "registrar"] },
   { href: "/dashboard/schedules", label: "Schedule Admin",   icon: "calendarEdit",  section: "mgmt",   roles: ["admin"] },
-  { href: "/dashboard/timetable", label: "Timetable Planner", icon: "calendarEdit", section: "mgmt",   roles: ["admin"] },
+  { href: "/dashboard/timetable", label: "AI Routine Generator", icon: "calendarEdit", section: "mgmt",   roles: ["admin"] },
   { href: "/dashboard/documents", label: "Document Center",  icon: "doc",           section: "mgmt",   roles: ["faculty", "admin", "registrar"] },
   { href: "/dashboard/approvals", label: "Approvals",        icon: "check",         section: "mgmt",   roles: ["admin", "registrar"] },
   { href: "/dashboard/notices",   label: "Notice Composer",  icon: "bell",          section: "mgmt",   roles: ["admin", "registrar"] },

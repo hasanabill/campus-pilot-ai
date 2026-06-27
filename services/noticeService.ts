@@ -52,7 +52,7 @@ async function resolveDepartmentId(value: string): Promise<Types.ObjectId> {
 
   if (!department) {
     throw new Error(
-      `Department "${value}" was not found. Use a department code from master data, such as CIS/CSE/EEE/10, or a MongoDB _id.`,
+      `Department "${value}" was not found. Use a department code from master data, such as CIS/EEE/10, or a MongoDB _id.`,
     );
   }
 

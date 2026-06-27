@@ -122,7 +122,7 @@ export default function KnowledgeBaseUploadClient({
           </div>
           <div>
             <label htmlFor="kb-dept" className="cp-label">Department code or ID</label>
-            <input id="kb-dept" required value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="cp-input" placeholder="CIS, CSE, EEE, or MongoDB _id" />
+            <input id="kb-dept" required value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="cp-input" placeholder="CIS, EEE, or MongoDB _id" />
             <p className="mt-1 text-xs text-zinc-400">Use the department code from master data. The backend resolves it to the internal database ID.</p>
           </div>
           <div>
